@@ -73,8 +73,8 @@ new_http_archive(
 new_http_archive(
     name = "clion_2018_2",
     build_file = "@//intellij_platform_sdk:BUILD.clion",
-    sha256 = "ab61071b5798f3c933072d1ad336cbf16e155ced93e9e1d92c61ff8d7fe34301",
-    url = "https://download.jetbrains.com/cpp/CLion-2018.2.3.tar.gz",
+    sha256 = "d284345ae11224c4c29ab8dfcb516cf6e43958a5cf9c902dea110d28fde32b2f",
+    url = "https://download.jetbrains.com/cpp/CLion-2018.2.5.tar.gz",
 )
 
 # The plugin api for Android Studio 3.2. This is required to build ASwB,

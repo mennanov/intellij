@@ -94,6 +94,13 @@ config_setting(
 )
 
 config_setting(
+    name = "android-studio-3.4",
+    values = {
+        "define": "ij_product=android-studio-3.4",
+    },
+)
+
+config_setting(
     name = "android-studio-canary",
     values = {
         "define": "ij_product=android-studio-canary",

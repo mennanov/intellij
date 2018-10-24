@@ -19,6 +19,7 @@ import com.google.common.collect.Lists;
 import com.google.idea.blaze.base.model.primitives.Label;
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.List;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 
@@ -26,7 +27,7 @@ import javax.annotation.Nullable;
 public final class AndroidIdeInfo implements Serializable {
   private static final long serialVersionUID = 6L;
 
-  private final Collection<AndroidResFolder> resources;
+  private final List<AndroidResFolder> resources;
   @Nullable private final ArtifactLocation manifest;
   @Nullable private final LibraryArtifact idlJar;
   @Nullable private final LibraryArtifact resourceJar;
@@ -36,7 +37,7 @@ public final class AndroidIdeInfo implements Serializable {
   @Nullable private final Label legacyResources;
 
   public AndroidIdeInfo(
-      Collection<AndroidResFolder> resources,
+      List<AndroidResFolder> resources,
       @Nullable String resourceJavaPackage,
       boolean generateResourceClass,
       @Nullable ArtifactLocation manifest,
@@ -54,7 +55,7 @@ public final class AndroidIdeInfo implements Serializable {
     this.legacyResources = legacyResources;
   }
 
-  public Collection<AndroidResFolder> getResFolders() {
+  public List<AndroidResFolder> getResFolders() {
     return resources;
   }
 
@@ -102,7 +103,7 @@ public final class AndroidIdeInfo implements Serializable {
 
   /** Builder for android rule */
   public static class Builder {
-    private Collection<AndroidResFolder> resources = Lists.newArrayList();
+    private List<AndroidResFolder> resources = Lists.newArrayList();
     private ArtifactLocation manifest;
     private LibraryArtifact idlJar;
     private LibraryArtifact resourceJar;
