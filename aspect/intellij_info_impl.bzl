@@ -10,6 +10,8 @@ load(
     "to_artifact_location",
 )
 
+load("@io_bazel_rules_go//go:def.bzl", "GoSource")
+
 # Defensive list of features that can appear in the C++ toolchain, but which we
 # definitely don't want to enable (when enabled, they'd contribute command line
 # flags that don't make sense in the context of intellij info).
@@ -244,8 +246,9 @@ def collect_go_info(target, ctx, semantics, ide_info, ide_info_file, output_grou
         # then manually construct the .go file in the sync plugin
         # TODO(chaorenl): change this if we ever get the .go file from a provider
         generated += target.files.to_list()
-    else:
-        proto_sources = _collect_generated_proto_go_sources(target)
+    elif ctx.rule.kind == 'go_proto_library':
+        proto_files = getattr(target[GoSource], "srcs", [])
+        proto_sources = [f for f in proto_files if f.basename.endswith(".pb.go")]
         if not proto_sources:
             return False
         sources += proto_sources
