@@ -17,7 +17,6 @@ package com.google.idea.blaze.java.run.fastbuild;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.idea.blaze.base.settings.BuildSystem;
-import com.intellij.execution.ExecutionException;
 import com.intellij.openapi.project.Project;
 
 final class BazelFastBuildTestEnvironmentCreatorFactory
@@ -32,11 +31,7 @@ final class BazelFastBuildTestEnvironmentCreatorFactory
   public FastBuildTestEnvironmentCreator getTestEnvironmentCreator(Project project) {
     return new FastBuildTestEnvironmentCreator(
         project,
-        /* testClassProperty */ "bazel.test_suite",
-        /* testRunner */ "com.google.testing.junit.runner.BazelTestRunner",
-        /* roboelectricDepsPropertiesFinder */
-        fastBuildInfo -> {
-          throw new ExecutionException("Fast builds do not support android_local_test targets");
-        });
+        /* testClassProperty= */ "bazel.test_suite",
+        /* testRunner= */ "com.google.testing.junit.runner.BazelTestRunner");
   }
 }

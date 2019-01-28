@@ -25,7 +25,6 @@ import com.google.idea.blaze.base.command.BlazeInvocationContext;
 import com.google.idea.blaze.base.console.BlazeConsoleLineProcessorProvider;
 import com.google.idea.blaze.base.issueparser.IssueOutputFilter;
 import com.google.idea.blaze.base.logging.EventLoggingService;
-import com.google.idea.blaze.base.model.primitives.Kind;
 import com.google.idea.blaze.base.model.primitives.TargetExpression;
 import com.google.idea.blaze.base.model.primitives.WorkspaceRoot;
 import com.google.idea.blaze.base.projectview.ProjectViewManager;
@@ -43,8 +42,10 @@ import com.google.idea.blaze.base.scope.scopes.IssuesScope;
 import com.google.idea.blaze.base.settings.Blaze;
 import com.google.idea.blaze.base.settings.BlazeUserSettings;
 import com.google.idea.blaze.base.settings.BuildSystem;
+import com.google.idea.blaze.cpp.CppBlazeRules;
 import com.google.idea.common.experiments.BoolExperiment;
-import com.google.idea.sdkcompat.cidr.CidrLauncherCompat;
+import com.google.idea.sdkcompat.clion.CPPToolSetAdapter;
+import com.google.idea.sdkcompat.clion.CidrGoogleTestUtilAdapter;
 import com.google.idea.sdkcompat.clion.ToolchainUtils;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configuration.EnvironmentVariablesData;
@@ -73,8 +74,8 @@ import com.jetbrains.cidr.execution.debugger.CidrLocalDebugProcess;
 import com.jetbrains.cidr.execution.debugger.backend.DebuggerDriverConfiguration;
 import com.jetbrains.cidr.execution.debugger.remote.CidrRemoteDebugParameters;
 import com.jetbrains.cidr.execution.debugger.remote.CidrRemotePathMapping;
+import com.jetbrains.cidr.execution.testing.CidrLauncher;
 import com.jetbrains.cidr.execution.testing.google.CidrGoogleTestConsoleProperties;
-import com.jetbrains.cidr.execution.testing.google.CidrGoogleTestUtil;
 import com.jetbrains.cidr.lang.toolchains.CidrToolEnvironment.PrepareFor;
 import java.io.File;
 import java.util.List;
@@ -85,7 +86,7 @@ import javax.annotation.Nullable;
  * Handles running/debugging cc_test and cc_binary targets in CLion. Sets up gdb when debugging, and
  * uses the Google Test infrastructure for presenting test results.
  */
-public final class BlazeCidrLauncher extends CidrLauncherCompat {
+public final class BlazeCidrLauncher extends CidrLauncher {
 
   private final Project project;
   private final BlazeCommandRunConfiguration configuration;
@@ -241,26 +242,34 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
     EventLoggingService.getInstance().ifPresent(s -> s.logEvent(getClass(), "debugging-cpp"));
 
     WorkspaceRoot workspaceRoot = WorkspaceRoot.fromProject(project);
-
-    File workingDir = workspaceRoot.directory();
+    File workspaceRootDirectory = workspaceRoot.directory();
 
     if (!useRemoteDebugging.getValue()) {
+
+      File workingDir =
+          new File(runner.executableToDebug + ".runfiles", workspaceRootDirectory.getName());
+
+      if (!workingDir.exists()) {
+        workingDir = workspaceRootDirectory;
+      }
+
       GeneralCommandLine commandLine = new GeneralCommandLine(runner.executableToDebug.getPath());
 
       commandLine.setWorkDirectory(workingDir);
       commandLine.addParameters(handlerState.getExeFlagsState().getExpandedFlags());
+      commandLine.addParameters(handlerState.getTestArgs());
 
       EnvironmentVariablesData envState = handlerState.getEnvVarsState().getData();
       commandLine.withParentEnvironmentType(
           envState.isPassParentEnvs() ? ParentEnvironmentType.SYSTEM : ParentEnvironmentType.NONE);
       commandLine.getEnvironment().putAll(envState.getEnvs());
 
-      if (Kind.CC_TEST.equals(configuration.getTargetKind())) {
+      if (CppBlazeRules.RuleTypes.CC_TEST.getKind().equals(configuration.getTargetKind())) {
         convertBlazeTestFilterToExecutableFlag().ifPresent(commandLine::addParameters);
       }
 
       TrivialInstaller installer = new TrivialInstaller(commandLine);
-      ImmutableList<String> startupCommands = getGdbStartupCommands(workingDir);
+      ImmutableList<String> startupCommands = getGdbStartupCommands(workspaceRootDirectory);
       CLionRunParameters parameters =
           new CLionRunParameters(
               new BlazeGDBDriverConfiguration(project, startupCommands, workspaceRoot), installer);
@@ -275,7 +284,7 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
 
     ProcessHandler targetProcess = createProcess(state, extraDebugFlags, true);
 
-    configProcessHandler(state, targetProcess, false, true);
+    configProcessHandler(targetProcess, false, true, getProject());
 
     targetProcess.startNotify();
 
@@ -283,12 +292,13 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
         new CidrRemoteDebugParameters(
             "tcp:localhost:5556",
             runner.executableToDebug.getPath(),
-            workingDir.getPath(),
-            ImmutableList.of(new CidrRemotePathMapping("/proc/self/cwd", workingDir.getParent())));
+            workspaceRootDirectory.getPath(),
+            ImmutableList.of(
+                new CidrRemotePathMapping("/proc/self/cwd", workspaceRootDirectory.getParent())));
 
     CPPToolchains.Toolchain toolchainForDebugger =
         new ToolchainUtils.ToolchainCompat() {
-          private final CPPToolSet blazeToolSet = new BlazeToolSet(workingDir);
+          private final CPPToolSet blazeToolSet = new BlazeToolSet(workspaceRootDirectory);
 
           @Override
           public CPPToolSet getToolSet() {
@@ -315,11 +325,11 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
    * create it. By creating a CPPToolSet, we have an opportunity to alter the commandline before it
    * launches. See https://youtrack.jetbrains.com/issue/CPP-8362
    */
-  private static class BlazeToolSet extends CPPToolSet {
+  private static class BlazeToolSet extends CPPToolSetAdapter {
     private static final char[] separators = {'/'};
 
     private BlazeToolSet(File workingDirectory) {
-      super(Kind.MINGW, workingDirectory);
+      super(workingDirectory);
     }
 
     @Override
@@ -342,12 +352,6 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
       return ToolchainUtils.getDebuggerFile(ToolchainUtils.getToolchain());
     }
 
-    // This was converted to 'supportsDebugger' in 2018.2 #api181
-    @SuppressWarnings("MissingOverride")
-    public boolean isBundledGdbCompatible() {
-      return false;
-    }
-
     @Override
     public void prepareEnvironment(
         GeneralCommandLine cl, PrepareFor prepareFor, List<CPPToolSet.Option> options)
@@ -358,7 +362,7 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
       }
     }
 
-    @SuppressWarnings("MissingOverride")
+    @Override
     public boolean supportsDebugger(CPPDebugger.Kind kind) {
       return kind == CPPDebugger.Kind.CUSTOM_GDB;
     }
@@ -374,12 +378,11 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
 
   private boolean shouldDisplayBazelTestFilterWarning() {
     return Blaze.getBuildSystem(getProject()).equals(BuildSystem.Bazel)
-        && Kind.CC_TEST.equals(configuration.getTargetKind())
+        && CppBlazeRules.RuleTypes.CC_TEST.getKind().equals(configuration.getTargetKind())
         && handlerState.getTestFilterFlag() != null
         && !PropertiesComponent.getInstance()
             .getBoolean(DISABLE_BAZEL_GOOGLETEST_FILTER_WARNING, false)
-        && !CidrGoogleTestUtil.findGoogleTestSymbolsForSuiteRandomly(getProject(), null, true)
-            .isEmpty();
+        && CidrGoogleTestUtilAdapter.findGoogleTestSymbol(getProject()) != null;
   }
 
   /**
@@ -405,7 +408,7 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
 
   private ImmutableList<Filter> getConsoleFilters() {
     return ImmutableList.of(
-        new BlazeTargetFilter(project, true),
+        new BlazeTargetFilter(true),
         new UrlFilter(),
         new IssueOutputFilter(
             project,
@@ -423,12 +426,12 @@ public final class BlazeCidrLauncher extends CidrLauncherCompat {
         configuration.getProject(), /* CidrToolEnvironment */ null, /* baseDir */ null);
   }
 
-  private ImmutableList<String> getGdbStartupCommands(File workingDir) {
+  private ImmutableList<String> getGdbStartupCommands(File workspaceRootDirectory) {
     // Forge creates debug symbol paths rooted at /proc/self/cwd .
     // We need to tell gdb to translate this path prefix to the user's workspace
     // root so the IDE can find the files.
     String from = "/proc/self/cwd";
-    String to = workingDir.getPath();
+    String to = workspaceRootDirectory.getPath();
     String subPathCommand = String.format("set substitute-path %s %s", from, to);
 
     return ImmutableList.of(subPathCommand);

@@ -19,8 +19,8 @@ http_archive(
 http_archive(
     name = "intellij_ce_2018_3",
     build_file = "@//intellij_platform_sdk:BUILD.idea",
-    sha256 = "d7c8e0c9cd858cc9a09e7046e2c6283f01955d4d8f46a9edfa0c495059888e4f",
-    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIC/2018.3/ideaIC-2018.3.zip",
+    sha256 = "76b3f12c5810ec791c49e018ace4f3d350856dc400b8dfdb708ca5c74ddaba2d",
+    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIC/2018.3.2/ideaIC-2018.3.2.zip",
 )
 
 # The plugin api for IntelliJ UE 2018.2. This is required to run UE-specific
@@ -37,8 +37,8 @@ http_archive(
 http_archive(
     name = "intellij_ue_2018_3",
     build_file = "@//intellij_platform_sdk:BUILD.ue",
-    sha256 = "219159cf37a5f9d7b808007c92c55fd8383fa76bea1a83d8c0c6b63d03d6b93d",
-    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIU/2018.3/ideaIU-2018.3.zip",
+    sha256 = "b5be15746578158b0996996e259694ea80e900da77d3d5e6a49c41974b8e19f0",
+    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIU/2018.3.2/ideaIU-2018.3.2.zip",
 )
 
 # The plugin api for CLion 2018.2. This is required to build CLwB,
@@ -46,8 +46,8 @@ http_archive(
 http_archive(
     name = "clion_2018_2",
     build_file = "@//intellij_platform_sdk:BUILD.clion",
-    sha256 = "d284345ae11224c4c29ab8dfcb516cf6e43958a5cf9c902dea110d28fde32b2f",
-    url = "https://download.jetbrains.com/cpp/CLion-2018.2.5.tar.gz",
+    sha256 = "2e1742c6769cceb806acedaffeaf764cdf5990d7dbd0165741400e788d1af5d5",
+    url = "https://download.jetbrains.com/cpp/CLion-2018.2.6.tar.gz",
 )
 
 # The plugin api for CLion 2018.3. This is required to build CLwB,
@@ -55,8 +55,8 @@ http_archive(
 http_archive(
     name = "clion_2018_3",
     build_file = "@//intellij_platform_sdk:BUILD.clion",
-    sha256 = "111fa549c11468c663d123761c7e44f7726b2d5fe16619f6c6ab5e9578add966",
-    url = "https://download.jetbrains.com/cpp/CLion-183.3975.20.tar.gz",
+    sha256 = "b42557e2b09383121a4347fc74c1f903fe08607ef0f3ceb279dd20c519e583e5",
+    url = "https://download.jetbrains.com/cpp/CLion-2018.3.2.tar.gz",
 )
 
 # The plugin api for Android Studio 3.2. This is required to build ASwB,
@@ -106,8 +106,8 @@ http_archive(
         "    visibility = ['//visibility:public'],",
         ")",
     ]),
-    sha256 = "346898238e3cab9d062407d4837a84315ddeb8a6ee981af7678571e77118cf37",
-    url = "https://plugins.jetbrains.com/files/7322/50178/python-ce-2018.3.183.2635.13.zip",
+    sha256 = "15969495651d8fcb6e3ae7ea33ef1b15ed62a7a929b016f6ec389a217fdad1d6",
+    url = "https://plugins.jetbrains.com/files/7322/52274/python-ce-2018.3.183.4284.148.zip",
 )
 
 # Go plugin for IntelliJ UE. Required at compile-time for Bazel integration.
@@ -134,8 +134,8 @@ http_archive(
         "    visibility = ['//visibility:public'],",
         ")",
     ]),
-    sha256 = "1dc6b34e20ca8bc18107162564d72347b4fb57e20f82eda45a9deefa98b9b533",
-    url = "https://plugins.jetbrains.com/files/9568/51834/intellij-go-183.4284.36.1532.zip",
+    sha256 = "3bcab5174d20363cd3f91302b32d0e9d3114533397d70ed03084e5ac8dbe5d66",
+    url = "https://plugins.jetbrains.com/files/9568/52280/intellij-go-183.4284.148.1556.zip",
 )
 
 # Scala plugin for IntelliJ CE 2018.2. Required at compile-time for scala-specific features.
@@ -169,8 +169,8 @@ http_archive(
 http_archive(
     name = "android_studio_3_3",
     build_file = "@//intellij_platform_sdk:BUILD.android_studio",
-    sha256 = "02369c3ae059091d7593546d072a70307be13b7f6db276b9a78507b6a9e5ff89",
-    url = "https://dl.google.com/android/studio/ide-zips/3.3.0.16/android-studio-ide-182.5114240-linux.zip",
+    sha256 = "1e62d69c5e9e97c9ff04af5c0edabf9d95126b155ceb8f1a9398b028fb2414e7",
+    url = "https://dl.google.com/android/studio/ide-zips/3.3.0.19/android-studio-ide-182.5183351-linux.zip",
 )
 
 # LICENSE: Common Public License 1.0
@@ -218,15 +218,15 @@ maven_jar(
 # LICENSE: The Apache Software License, Version 2.0
 maven_jar(
     name = "auto_value",
-    artifact = "com.google.auto.value:auto-value:1.6",
-    sha1 = "a3b1b1404f8acaa88594a017185e013cd342c9a8",
+    artifact = "com.google.auto.value:auto-value:1.6.2",
+    sha1 = "e7eae562942315a983eea3e191b72d755c153620",
 )
 
 # LICENSE: The Apache Software License, Version 2.0
 maven_jar(
     name = "auto_value_annotations",
-    artifact = "com.google.auto.value:auto-value-annotations:1.6",
-    sha1 = "da725083ee79fdcd86d9f3d8a76e38174a01892a",
+    artifact = "com.google.auto.value:auto-value-annotations:1.6.2",
+    sha1 = "ed193d86e0af90cc2342aedbe73c5d86b03fa09b",
 )
 
 # LICENSE: The Apache Software License, Version 2.0
@@ -240,9 +240,9 @@ maven_jar(
 # proto_library rules implicitly depend on @com_google_protobuf//:protoc
 http_archive(
     name = "com_google_protobuf",
-    sha256 = "e514c2e613dc47c062ea8df480efeec368ffbef98af0437ac00cdaadcb0d80d2",
-    strip_prefix = "protobuf-3.6.0",
-    urls = ["https://github.com/google/protobuf/archive/v3.6.0.zip"],
+    sha256 = "9510dd2afc29e7245e9e884336f848c8a6600a14ae726adb6befdb4f786f0be2",
+    strip_prefix = "protobuf-3.6.1.3",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.6.1.3.zip"],
 )
 
 # LICENSE: The Apache Software License, Version 2.0
@@ -251,16 +251,16 @@ http_archive(
 # required).
 http_archive(
     name = "com_google_protobuf_java",
-    sha256 = "e514c2e613dc47c062ea8df480efeec368ffbef98af0437ac00cdaadcb0d80d2",
-    strip_prefix = "protobuf-3.6.0",
-    urls = ["https://github.com/google/protobuf/archive/v3.6.0.zip"],
+    sha256 = "9510dd2afc29e7245e9e884336f848c8a6600a14ae726adb6befdb4f786f0be2",
+    strip_prefix = "protobuf-3.6.1.3",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.6.1.3.zip"],
 )
 
 # BEGIN-EXTERNAL-SCALA
 # LICENSE: The Apache Software License, Version 2.0
 git_repository(
     name = "io_bazel_rules_scala",
-    commit = "8359fc6781cf3102e918c84cb1638a1b1e050ce0",
+    commit = "326b4ce252c36aeff2232e241ff4bfd8d6f6e071",
     remote = "https://github.com/bazelbuild/rules_scala.git",
 )
 
@@ -277,7 +277,7 @@ scala_register_toolchains()
 # LICENSE: The Apache Software License, Version 2.0
 git_repository(
     name = "io_bazel_rules_kotlin",
-    commit = "6d8dcd4d6000d0cf3321eb8580d8fc67f8731f8e",
+    commit = "cab5eaffc2012dfe46260c03d6419c0d2fa10be0",
     remote = "https://github.com/bazelbuild/rules_kotlin.git",
 )
 

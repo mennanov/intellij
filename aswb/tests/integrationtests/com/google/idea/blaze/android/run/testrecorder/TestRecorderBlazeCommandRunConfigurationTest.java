@@ -34,7 +34,9 @@ import com.google.idea.blaze.base.run.BlazeCommandRunConfiguration;
 import com.google.idea.blaze.base.run.BlazeCommandRunConfigurationType;
 import com.google.idea.blaze.base.run.confighandler.BlazeCommandRunConfigurationHandler;
 import com.google.idea.blaze.base.run.confighandler.BlazeCommandRunConfigurationHandlerProvider;
+import com.google.idea.blaze.base.run.confighandler.BlazeCommandRunConfigurationHandlerProvider.TargetState;
 import com.google.idea.blaze.base.sync.data.BlazeProjectDataManager;
+import com.google.idea.blaze.java.AndroidBlazeRules;
 import com.google.idea.sdkcompat.run.RunManagerCompat;
 import com.intellij.execution.RunManagerEx;
 import com.intellij.execution.configurations.ConfigurationType;
@@ -86,12 +88,12 @@ public class TestRecorderBlazeCommandRunConfigurationTest extends BlazeIntegrati
         TargetMapBuilder.builder()
             .addTarget(
                 TargetIdeInfo.builder()
-                    .setKind(Kind.ANDROID_BINARY)
+                    .setKind(AndroidBlazeRules.RuleTypes.ANDROID_BINARY.getKind())
                     .setLabel("//label:android_binary_rule")
                     .build())
             .addTarget(
                 TargetIdeInfo.builder()
-                    .setKind(Kind.ANDROID_TEST)
+                    .setKind(AndroidBlazeRules.RuleTypes.ANDROID_TEST.getKind())
                     .setLabel("//label:android_test_rule")
                     .build())
             .build());
@@ -165,7 +167,7 @@ public class TestRecorderBlazeCommandRunConfigurationTest extends BlazeIntegrati
   private class MockBlazeAndroidBinaryRunConfigurationHandlerProvider
       extends BlazeAndroidBinaryRunConfigurationHandlerProvider {
     @Override
-    public boolean canHandleKind(Kind kind) {
+    public boolean canHandleKind(TargetState state, @Nullable Kind kind) {
       return true;
     }
 

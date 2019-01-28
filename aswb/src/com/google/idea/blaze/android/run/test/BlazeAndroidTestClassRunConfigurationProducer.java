@@ -18,12 +18,12 @@ package com.google.idea.blaze.android.run.test;
 import com.android.tools.idea.testartifacts.instrumented.AndroidTestRunConfiguration;
 import com.google.common.base.Strings;
 import com.google.idea.blaze.base.dependencies.TargetInfo;
-import com.google.idea.blaze.base.model.primitives.Kind;
 import com.google.idea.blaze.base.run.BlazeCommandRunConfiguration;
 import com.google.idea.blaze.base.run.BlazeCommandRunConfigurationType;
+import com.google.idea.blaze.base.run.TestTargetHeuristic;
 import com.google.idea.blaze.base.run.producers.BlazeRunConfigurationProducer;
 import com.google.idea.blaze.base.run.smrunner.SmRunnerUtils;
-import com.google.idea.blaze.java.run.RunUtil;
+import com.google.idea.blaze.java.AndroidBlazeRules;
 import com.google.idea.blaze.java.run.producers.JUnitConfigurationUtil;
 import com.google.idea.blaze.java.run.producers.ProducerUtils;
 import com.intellij.execution.JavaExecutionUtil;
@@ -75,11 +75,11 @@ public class BlazeAndroidTestClassRunConfigurationProducer
     }
     sourceElement.set(testClass);
 
-    TargetInfo target = RunUtil.targetForTestClass(testClass, null);
+    TargetInfo target = TestTargetHeuristic.testTargetForPsiElement(testClass, null);
     if (target == null) {
       return false;
     }
-    if (!Kind.ANDROID_TEST.equals(target.getKind())) {
+    if (!AndroidBlazeRules.RuleTypes.ANDROID_TEST.getKind().equals(target.getKind())) {
       return false;
     }
     configuration.setTargetInfo(target);

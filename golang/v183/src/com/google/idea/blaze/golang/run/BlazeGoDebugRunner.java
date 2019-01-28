@@ -60,8 +60,8 @@ public class BlazeGoDebugRunner extends GoBuildingRunner {
         handlerState != null ? handlerState.getCommandState().getCommand() : null;
     Kind kind = config.getTargetKind();
     return kind != null
-        && kind.languageClass.equals(LanguageClass.GO)
-        && (kind.ruleType.equals(RuleType.BINARY) || kind.ruleType.equals(RuleType.TEST))
+        && kind.getLanguageClass().equals(LanguageClass.GO)
+        && (kind.getRuleType().equals(RuleType.BINARY) || kind.getRuleType().equals(RuleType.TEST))
         && (BlazeCommandName.TEST.equals(command) || BlazeCommandName.RUN.equals(command));
   }
 
@@ -78,11 +78,6 @@ public class BlazeGoDebugRunner extends GoBuildingRunner {
     }
     BlazeGoDummyDebugProfileState blazeState = (BlazeGoDummyDebugProfileState) state;
     GoApplicationRunningState goState = blazeState.toNativeState(environment);
-    goState.setOutputFilePath(blazeState.getExecutable(environment).getPath());
-    String arguments = blazeState.getExecutableArguments();
-    if (arguments != null) {
-      goState.getConfiguration().setParams(arguments);
-    }
     ExecutionResult executionResult = goState.execute(environment.getExecutor(), this);
     return XDebuggerManager.getInstance(environment.getProject())
         .startSession(

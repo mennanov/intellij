@@ -21,8 +21,8 @@ import com.google.idea.blaze.base.scope.BlazeContext;
 import com.google.idea.blaze.base.settings.Blaze;
 import com.google.idea.blaze.base.sync.BlazeSyncManager;
 import com.google.idea.blaze.base.sync.BlazeSyncParams;
-import com.google.idea.blaze.base.sync.BlazeSyncParams.SyncMode;
 import com.google.idea.blaze.base.sync.SyncListener;
+import com.google.idea.blaze.base.sync.SyncMode;
 import com.google.idea.blaze.base.sync.status.BlazeSyncStatus;
 import com.google.idea.common.experiments.BoolExperiment;
 import com.intellij.openapi.components.ProjectComponent;
@@ -53,7 +53,7 @@ class AutoSyncHandler implements ProjectComponent {
   private static Logger logger = Logger.getInstance(AutoSyncHandler.class);
 
   private final PendingChangesHandler<VirtualFile> pendingChangesHandler =
-      new PendingChangesHandler<VirtualFile>(/* delayMillis */ 2000) {
+      new PendingChangesHandler<VirtualFile>(/* delayMillis= */ 2000) {
         @Override
         boolean runTask(ImmutableSet<VirtualFile> changes) {
           if (BlazeSyncStatus.getInstance(project).syncInProgress()) {

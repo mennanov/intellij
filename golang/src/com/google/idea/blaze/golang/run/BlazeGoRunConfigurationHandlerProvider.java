@@ -28,10 +28,10 @@ public class BlazeGoRunConfigurationHandlerProvider
     implements BlazeCommandRunConfigurationHandlerProvider {
 
   @Override
-  public boolean canHandleKind(@Nullable Kind kind) {
+  public boolean canHandleKind(TargetState state, @Nullable Kind kind) {
     return kind != null
-        && kind.languageClass.equals(LanguageClass.GO)
-        && (kind.ruleType.equals(RuleType.BINARY) || kind.ruleType.equals(RuleType.TEST));
+        && kind.getLanguageClass().equals(LanguageClass.GO)
+        && (kind.getRuleType().equals(RuleType.BINARY) || kind.getRuleType().equals(RuleType.TEST));
   }
 
   @Override

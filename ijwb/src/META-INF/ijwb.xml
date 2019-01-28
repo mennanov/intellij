@@ -15,21 +15,8 @@
   -->
 <idea-plugin>
   <vendor>Google</vendor>
-
   <extensions defaultExtensionNs="com.intellij">
     <applicationService serviceInterface="com.google.idea.blaze.base.plugin.BlazePluginId"
                         serviceImplementation="com.google.idea.blaze.ijwb.plugin.IjwbPluginId"/>
-    <additionalLibraryRootsProvider
-        implementation="com.google.idea.blaze.ijwb.javascript.BlazeJavascriptAdditionalLibraryRootsProvider"/>
-    <additionalLibraryRootsProvider
-        implementation="com.google.idea.blaze.ijwb.typescript.BlazeTypescriptAdditionalLibraryRootsProvider"/>
   </extensions>
-
-  <extensions defaultExtensionNs="com.google.idea.blaze">
-    <SyncPlugin implementation="com.google.idea.blaze.ijwb.javascript.BlazeJavascriptSyncPlugin"/>
-    <SyncPlugin implementation="com.google.idea.blaze.ijwb.typescript.BlazeTypescriptSyncPlugin"/>
-    <PrefetchFileSource implementation="com.google.idea.blaze.ijwb.javascript.JavascriptPrefetchFileSource"/>
-    <PrefetchFileSource implementation="com.google.idea.blaze.ijwb.typescript.TypescriptPrefetchFileSource"/>
-  </extensions>
-
 </idea-plugin>

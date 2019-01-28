@@ -40,7 +40,7 @@ final class FileExperimentLoader extends HashingExperimentLoader {
 
   private volatile boolean refresh = true;
 
-  private Map<String, String> experiments = ImmutableMap.of();
+  private ImmutableMap<String, String> experiments = ImmutableMap.of();
 
   FileExperimentLoader(String filename) {
     this.file = new File(filename);
@@ -48,7 +48,7 @@ final class FileExperimentLoader extends HashingExperimentLoader {
 
   @SuppressWarnings("unchecked") // Properties is Map<Object, Object>, we cast to strings
   @Override
-  Map<String, String> getUnhashedExperiments() {
+  ImmutableMap<String, String> getUnhashedExperiments() {
 
     if (!refresh) {
       return experiments;
@@ -84,7 +84,7 @@ final class FileExperimentLoader extends HashingExperimentLoader {
 
   private void doInitialize() {
     LocalFileSystem fileSystem = LocalFileSystem.getInstance();
-    fileSystem.addRootToWatch(file.getPath(), /* watchRecursively */ false);
+    fileSystem.addRootToWatch(file.getPath(), /* watchRecursively= */ false);
     // We need to look up the file in the VFS or else we don't receive events about it. This works
     // even if the returned VirtualFile is null (because the experiments file doesn't exist yet).
     fileSystem.findFileByIoFile(file);

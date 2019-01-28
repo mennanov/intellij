@@ -23,7 +23,7 @@ import com.google.common.collect.Lists;
 import com.google.idea.blaze.android.run.BlazeAndroidRunConfigurationCommonState;
 import com.google.idea.blaze.android.run.BlazeAndroidRunConfigurationHandler;
 import com.google.idea.blaze.android.run.BlazeAndroidRunConfigurationValidationUtil;
-import com.google.idea.blaze.android.run.binary.BlazeAndroidBinaryLaunchMethodsProvider.AndroidBinaryLaunchMethod;
+import com.google.idea.blaze.android.run.binary.AndroidBinaryLaunchMethodsUtils.AndroidBinaryLaunchMethod;
 import com.google.idea.blaze.android.run.binary.mobileinstall.BlazeAndroidBinaryMobileInstallRunContext;
 import com.google.idea.blaze.android.run.runner.BlazeAndroidRunConfigurationRunner;
 import com.google.idea.blaze.android.run.runner.BlazeAndroidRunContext;
@@ -31,7 +31,6 @@ import com.google.idea.blaze.android.sync.projectstructure.BlazeAndroidProjectSt
 import com.google.idea.blaze.base.command.BlazeCommandName;
 import com.google.idea.blaze.base.command.BlazeInvocationContext;
 import com.google.idea.blaze.base.logging.EventLoggingService;
-import com.google.idea.blaze.base.model.primitives.Kind;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.model.primitives.TargetExpression;
 import com.google.idea.blaze.base.projectview.ProjectViewManager;
@@ -43,6 +42,7 @@ import com.google.idea.blaze.base.run.ExecutorType;
 import com.google.idea.blaze.base.run.confighandler.BlazeCommandRunConfigurationRunner;
 import com.google.idea.blaze.base.run.state.RunConfigurationState;
 import com.google.idea.blaze.base.settings.Blaze;
+import com.google.idea.blaze.java.AndroidBlazeRules;
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.Executor;
 import com.intellij.execution.RunManager;
@@ -55,7 +55,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import javax.swing.Icon;
 import org.jetbrains.android.facet.AndroidFacet;
 import org.jetbrains.annotations.Nullable;
 
@@ -188,7 +187,9 @@ public class BlazeAndroidBinaryRunConfigurationHandler
     errors.addAll(configState.validate(facet));
     errors.addAll(
         BlazeAndroidRunConfigurationValidationUtil.validateLabel(
-            getLabel(), configuration.getProject(), ImmutableList.of(Kind.ANDROID_BINARY)));
+            getLabel(),
+            configuration.getProject(),
+            ImmutableList.of(AndroidBlazeRules.RuleTypes.ANDROID_BINARY.getKind())));
     return errors;
   }
 
@@ -212,12 +213,6 @@ public class BlazeAndroidBinaryRunConfigurationHandler
   @Override
   public String getHandlerName() {
     return "Android Binary Handler";
-  }
-
-  @Override
-  @Nullable
-  public Icon getExecutorIcon(RunConfiguration configuration, Executor executor) {
-    return null;
   }
 
   /**

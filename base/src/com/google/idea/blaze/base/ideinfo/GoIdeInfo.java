@@ -20,6 +20,8 @@ import com.google.common.collect.ImmutableList;
 import com.google.devtools.intellij.ideinfo.IntellijIdeInfo;
 import com.google.idea.blaze.base.model.primitives.Kind;
 import com.google.idea.blaze.base.model.primitives.Label;
+import com.google.idea.blaze.base.model.primitives.LanguageClass;
+import com.google.idea.blaze.base.model.primitives.RuleType;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -61,7 +63,9 @@ public final class GoIdeInfo implements ProtoWrapper<IntellijIdeInfo.GoIdeInfo> 
   @Nullable
   private static Label extractLibraryLabel(
       @Nullable String libraryLabelString, Label targetLabel, Kind targetKind) {
-    if (libraryLabelString == null || !targetKind.isOneOf(Kind.GO_TEST, Kind.GO_APPENGINE_TEST)) {
+    if (libraryLabelString == null
+        || !targetKind.getLanguageClass().equals(LanguageClass.GO)
+        || !targetKind.getRuleType().equals(RuleType.TEST)) {
       return null;
     }
     Label libraryLabel = Label.create(libraryLabelString);
@@ -71,9 +75,8 @@ public final class GoIdeInfo implements ProtoWrapper<IntellijIdeInfo.GoIdeInfo> 
   @Override
   public IntellijIdeInfo.GoIdeInfo toProto() {
     IntellijIdeInfo.GoIdeInfo.Builder builder =
-        IntellijIdeInfo.GoIdeInfo.newBuilder()
-            .addAllSources(ProtoWrapper.mapToProtos(sources))
-            .setImportPath(importPath);
+        IntellijIdeInfo.GoIdeInfo.newBuilder().addAllSources(ProtoWrapper.mapToProtos(sources));
+    ProtoWrapper.setIfNotNull(builder::setImportPath, importPath);
     ProtoWrapper.unwrapAndSetIfNotNull(builder::setLibraryLabel, libraryLabel);
     return builder.build();
   }
@@ -100,9 +103,10 @@ public final class GoIdeInfo implements ProtoWrapper<IntellijIdeInfo.GoIdeInfo> 
   public static class Builder {
     private final ImmutableList.Builder<ArtifactLocation> sources = ImmutableList.builder();
     @Nullable private String importPath = null;
+    @Nullable private Label libraryLabel = null;
 
-    public Builder addSources(Iterable<ArtifactLocation> sources) {
-      this.sources.addAll(sources);
+    public Builder addSource(ArtifactLocation source) {
+      this.sources.add(source);
       return this;
     }
 
@@ -111,8 +115,13 @@ public final class GoIdeInfo implements ProtoWrapper<IntellijIdeInfo.GoIdeInfo> 
       return this;
     }
 
+    public Builder setLibraryLabel(String libraryLabel) {
+      this.libraryLabel = Label.create(libraryLabel);
+      return this;
+    }
+
     public GoIdeInfo build() {
-      return new GoIdeInfo(sources.build(), importPath, null);
+      return new GoIdeInfo(sources.build(), importPath, libraryLabel);
     }
   }
 
@@ -125,6 +134,9 @@ public final class GoIdeInfo implements ProtoWrapper<IntellijIdeInfo.GoIdeInfo> 
         + "\n"
         + "  importPath="
         + getImportPath()
+        + "\n"
+        + "  libraryLabel="
+        + getLibraryLabel()
         + "\n"
         + '}';
   }

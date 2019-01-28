@@ -23,15 +23,13 @@ import com.google.idea.blaze.base.command.BlazeCommandName;
 import com.google.idea.blaze.base.model.primitives.Kind;
 import com.google.idea.blaze.base.model.primitives.RuleType;
 import com.google.idea.blaze.base.run.BlazeCommandRunConfiguration;
+import com.google.idea.blaze.base.run.confighandler.BlazeCommandRunConfigurationRunner;
 import com.google.idea.blaze.base.run.state.BlazeCommandRunConfigurationCommonState;
 import com.google.idea.blaze.java.sync.source.JavaLikeLanguage;
 import com.google.idea.common.experiments.BoolExperiment;
 import com.intellij.execution.Executor;
-import com.intellij.execution.configurations.RunProfile;
-import com.intellij.execution.configurations.WrappingRunConfiguration;
 import com.intellij.execution.executors.DefaultDebugExecutor;
 import com.intellij.execution.runners.ExecutionEnvironment;
-import java.util.Collection;
 
 /** Helper methods for HotSwapping */
 public final class HotSwapUtils {
@@ -44,10 +42,8 @@ public final class HotSwapUtils {
   private static final ImmutableSet<Kind> SUPPORTED_BINARIES = getSupportedBinaries();
 
   private static ImmutableSet<Kind> getSupportedBinaries() {
-    return JavaLikeLanguage.getAllJavaLikeLanguages().stream()
-        .map(Kind::allKindsForLanguage)
-        .flatMap(Collection::stream)
-        .filter(kind -> kind.ruleType == RuleType.BINARY)
+    return JavaLikeLanguage.getAllDebuggableKinds().stream()
+        .filter(kind -> kind.getRuleType().equals(RuleType.BINARY))
         .collect(toImmutableSet());
   }
 
@@ -55,26 +51,19 @@ public final class HotSwapUtils {
     if (!isDebugging(env) || !enableHotSwapping.getValue()) {
       return false;
     }
-    BlazeCommandRunConfiguration configuration = getConfiguration(env);
+    BlazeCommandRunConfiguration configuration =
+        BlazeCommandRunConfigurationRunner.getConfiguration(env);
     BlazeCommandRunConfigurationCommonState handlerState =
         configuration.getHandlerStateIfType(BlazeCommandRunConfigurationCommonState.class);
     Kind kind = configuration.getTargetKind();
     return BlazeCommandName.RUN.equals(
             Preconditions.checkNotNull(handlerState).getCommandState().getCommand())
         && kind != null
-        && kind.isOneOf(SUPPORTED_BINARIES);
+        && SUPPORTED_BINARIES.contains(kind);
   }
 
   private static boolean isDebugging(ExecutionEnvironment environment) {
     Executor executor = environment.getExecutor();
     return executor instanceof DefaultDebugExecutor;
-  }
-
-  private static BlazeCommandRunConfiguration getConfiguration(ExecutionEnvironment env) {
-    RunProfile runProfile = env.getRunProfile();
-    if (runProfile instanceof WrappingRunConfiguration) {
-      runProfile = ((WrappingRunConfiguration) runProfile).getPeer();
-    }
-    return (BlazeCommandRunConfiguration) runProfile;
   }
 }
