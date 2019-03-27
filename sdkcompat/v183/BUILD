@@ -7,9 +7,8 @@ load("//intellij_platform_sdk:build_defs.bzl", "select_for_ide")
 java_library(
     name = "v183",
     srcs = glob([
+        "com/google/idea/sdkcompat/configuration/**",
         "com/google/idea/sdkcompat/openapi/**",
-        "com/google/idea/sdkcompat/python/**",
-        "com/google/idea/sdkcompat/query/**",
         "com/google/idea/sdkcompat/run/**",
         "com/google/idea/sdkcompat/vcs/**",
     ]) + select_for_ide(
@@ -17,13 +16,13 @@ java_library(
             "com/google/idea/sdkcompat/cidr/**",
         ]),
         clion = glob([
-            "com/google/idea/sdkcompat/clion/**",
             "com/google/idea/sdkcompat/cidr/**",
             "com/google/idea/sdkcompat/javascript/**",
         ]),
         intellij = glob([
             "com/google/idea/sdkcompat/javascript/**",
             "com/google/idea/sdkcompat/golang/**",
+            "com/google/idea/sdkcompat/scala/**",
         ]),
     ),
     visibility = ["//sdkcompat:__pkg__"],
@@ -34,5 +33,6 @@ java_library(
         "//third_party/go",
         "//third_party/javascript",
         "//third_party/python",
+        "//third_party/scala",
     ],
 )

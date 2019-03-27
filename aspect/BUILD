@@ -4,6 +4,11 @@
 
 licenses(["notice"])  # Apache 2.0
 
+load(
+    ":intellij_info_impl.bzl",
+    "define_flag_hack",
+)
+
 # Files needed at runtime for blaze-invoking integration tests
 filegroup(
     name = "integration_test_files",
@@ -11,6 +16,7 @@ filegroup(
         "artifacts.bzl",
         "intellij_info_impl.bzl",
         "java_classpath.bzl",
+        "make_variables.bzl",
         ":BUILD.bazel",
         "//aspect/tools:JarFilter_deploy.jar",
         "//aspect/tools:PackageParser_deploy.jar",
@@ -28,6 +34,7 @@ filegroup(
         "intellij_info_bundled.bzl",
         "intellij_info_impl.bzl",
         "java_classpath.bzl",
+        "make_variables.bzl",
         ":BUILD.bazel",
         "//aspect/tools:JarFilter_deploy.jar",
         "//aspect/tools:PackageParser_deploy.jar",
@@ -56,3 +63,5 @@ genrule(
     cmd = "cat $(SRCS) >$@ && " +
           "sed -i -e 's,%s:\" + tool_name,//:\" + tool_name + \"_bin\",g' $@" % _dev_tools_path,
 )
+
+define_flag_hack()

@@ -19,6 +19,7 @@ package com.google.idea.blaze.java.run.producers;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
+import com.google.idea.blaze.java.run.producers.JUnitParameterizedClassHeuristic.ParameterizedTestInfo;
 import com.intellij.codeInsight.AnnotationUtil;
 import com.intellij.execution.Location;
 import com.intellij.execution.junit.JUnitUtil;
@@ -62,30 +63,50 @@ public final class BlazeJUnitTestFilterFlags {
       PsiClass psiClass, Collection<PsiMethod> methods) {
     JUnitVersion version =
         JUnitUtil.isJUnit4TestClass(psiClass) ? JUnitVersion.JUNIT_4 : JUnitVersion.JUNIT_3;
-    return testFilterForClassAndMethods(psiClass, version, extractMethodFilters(psiClass, methods));
+    ParameterizedTestInfo parameterizedTestInfo =
+        JUnitParameterizedClassHeuristic.getParameterizedTestInfo(psiClass);
+    return testFilterForClassAndMethods(
+        psiClass,
+        version,
+        extractMethodFilters(psiClass, methods, parameterizedTestInfo),
+        parameterizedTestInfo);
   }
 
   /** Runs all parameterized versions of methods. */
   private static List<String> extractMethodFilters(
-      PsiClass psiClass, Collection<PsiMethod> methods) {
+      PsiClass psiClass,
+      Collection<PsiMethod> methods,
+      ParameterizedTestInfo parameterizedTestInfo) {
     // standard org.junit.runners.Parameterized class requires no per-test annotations
-    boolean parameterizedClass = isParameterized(psiClass);
-    return methods
-        .stream()
-        .map((method) -> methodFilter(method, parameterizedClass))
+    String testSuffixRegex = getTestSuffixRegex(psiClass, parameterizedTestInfo);
+    return methods.stream()
+        .map((method) -> methodFilter(method, testSuffixRegex))
         .sorted()
         .collect(Collectors.toList());
   }
 
-  private static boolean isParameterized(PsiClass testClass) {
-    return PsiMemberParameterizedLocation.getParameterizedLocation(testClass, null) != null
-        || JUnitParameterizedClassHeuristic.isParameterizedTest(testClass);
+  @Nullable
+  private static String getTestSuffixRegex(
+      PsiClass testClass, ParameterizedTestInfo parameterizedTestInfo) {
+
+    if (parameterizedTestInfo != null) {
+      return parameterizedTestInfo.testMethodSuffixRegex();
+    }
+    if (PsiMemberParameterizedLocation.getParameterizedLocation(testClass, null) != null) {
+      return JUnitParameterizedClassHeuristic.STANDARD_JUNIT_TEST_SUFFIX;
+    }
+    return null;
   }
 
-  private static String methodFilter(PsiMethod method, boolean parameterizedClass) {
-    boolean parameterized =
-        parameterizedClass || AnnotationUtil.findAnnotation(method, "Parameters") != null;
-    return parameterized ? method.getName() + "(\\[.+\\])?" : method.getName();
+  private static String methodFilter(PsiMethod method, @Nullable String testSuffixRegex) {
+    if (testSuffixRegex != null) {
+      return method.getName() + testSuffixRegex;
+    } else if (AnnotationUtil.findAnnotation(method, "Parameters") != null) {
+      // Supports @junitparams.Parameters, an annotation that applies to an individual test method
+      return method.getName() + JUnitParameterizedClassHeuristic.STANDARD_JUNIT_TEST_SUFFIX;
+    } else {
+      return method.getName();
+    }
   }
 
   @Nullable
@@ -103,9 +124,14 @@ public final class BlazeJUnitTestFilterFlags {
       Map<PsiClass, Collection<Location<?>>> methodsPerClass, JUnitVersion version) {
     List<String> classFilters = new ArrayList<>();
     for (Entry<PsiClass, Collection<Location<?>>> entry : methodsPerClass.entrySet()) {
+      ParameterizedTestInfo parameterizedTestInfo =
+          JUnitParameterizedClassHeuristic.getParameterizedTestInfo(entry.getKey());
       String filter =
           testFilterForClassAndMethods(
-              entry.getKey(), version, extractMethodFilters(entry.getValue()));
+              entry.getKey(),
+              version,
+              extractMethodFilters(entry.getValue()),
+              parameterizedTestInfo);
       if (filter == null) {
         return null;
       }
@@ -119,8 +145,7 @@ public final class BlazeJUnitTestFilterFlags {
 
   /** Only runs specified parameterized versions, where relevant. */
   private static List<String> extractMethodFilters(Collection<Location<?>> methods) {
-    return methods
-        .stream()
+    return methods.stream()
         .map(BlazeJUnitTestFilterFlags::testFilterForLocation)
         .sorted()
         .collect(Collectors.toList());
@@ -153,12 +178,15 @@ public final class BlazeJUnitTestFilterFlags {
    */
   @Nullable
   private static String testFilterForClassAndMethods(
-      PsiClass psiClass, JUnitVersion version, List<String> methodFilters) {
+      PsiClass psiClass,
+      JUnitVersion version,
+      List<String> methodFilters,
+      ParameterizedTestInfo parameterizedTestInfo) {
     String className = psiClass.getQualifiedName();
     if (className == null) {
       return null;
     }
-    return testFilterForClassAndMethods(className, version, methodFilters);
+    return testFilterForClassAndMethods(className, version, methodFilters, parameterizedTestInfo);
   }
 
   /**
@@ -167,9 +195,15 @@ public final class BlazeJUnitTestFilterFlags {
    */
   @VisibleForTesting
   static String testFilterForClassAndMethods(
-      String className, JUnitVersion jUnitVersion, List<String> methodNames) {
+      String className,
+      JUnitVersion jUnitVersion,
+      List<String> methodFilters,
+      ParameterizedTestInfo parameterizedTestInfo) {
     StringBuilder output = new StringBuilder(className);
-    String methodNamePattern = concatenateMethodNames(methodNames, jUnitVersion);
+    if (parameterizedTestInfo != null && parameterizedTestInfo.testClassSuffixRegex() != null) {
+      output.append(parameterizedTestInfo.testClassSuffixRegex());
+    }
+    String methodNamePattern = concatenateMethodNames(methodFilters, jUnitVersion);
     if (Strings.isNullOrEmpty(methodNamePattern)) {
       if (jUnitVersion == JUnitVersion.JUNIT_4) {
         output.append('#');

@@ -31,11 +31,11 @@ import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.idea.blaze.base.async.executor.TransientExecutor;
 import com.google.idea.blaze.base.ideinfo.ArtifactLocation;
 import com.google.idea.blaze.base.ideinfo.TargetKey;
 import com.google.idea.blaze.base.model.primitives.WorkspacePath;
 import com.google.idea.blaze.base.model.primitives.WorkspaceRoot;
+import com.google.idea.blaze.base.prefetch.FetchExecutor;
 import com.google.idea.blaze.base.scope.BlazeContext;
 import com.google.idea.blaze.base.scope.Scope;
 import com.google.idea.blaze.base.scope.output.IssueOutput;
@@ -76,8 +76,6 @@ public final class SourceDirectoryCalculator {
   private static final JavaPackageReader generatedFileJavaPackageReader =
       new FilePathJavaPackageReader();
   private final ListeningExecutorService executorService = MoreExecutors.newDirectExecutorService();
-  private final ListeningExecutorService packageReaderExecutorService =
-      MoreExecutors.listeningDecorator(new TransientExecutor(16));
 
   public ImmutableList<BlazeContentEntry> calculateContentEntries(
       Project project,
@@ -96,11 +94,10 @@ public final class SourceDirectoryCalculator {
               Map<TargetKey, Map<ArtifactLocation, String>> manifestMap =
                   PackageManifestReader.getInstance()
                       .readPackageManifestFiles(
-                          project,
                           childContext,
                           artifactLocationDecoder,
                           javaPackageManifests,
-                          packageReaderExecutorService);
+                          FetchExecutor.EXECUTOR);
               return new ManifestFilePackageReader(manifestMap);
             });
 
@@ -114,7 +111,7 @@ public final class SourceDirectoryCalculator {
 
     // Sort artifacts and excludes into their respective workspace paths
     Multimap<WorkspacePath, SourceArtifact> sourcesUnderDirectoryRoot =
-        sortArtifactLocationsByRootDirectory(context, importRoots, nonGeneratedSources);
+        sortArtifactLocationsByRootDirectory(importRoots, nonGeneratedSources);
 
     List<BlazeContentEntry> result = Lists.newArrayList();
     Scope.push(
@@ -146,7 +143,7 @@ public final class SourceDirectoryCalculator {
   }
 
   private static Multimap<WorkspacePath, SourceArtifact> sortArtifactLocationsByRootDirectory(
-      BlazeContext context, ImportRoots importRoots, Collection<SourceArtifact> sources) {
+      ImportRoots importRoots, Collection<SourceArtifact> sources) {
 
     Multimap<WorkspacePath, SourceArtifact> result = ArrayListMultimap.create();
 
@@ -156,23 +153,10 @@ public final class SourceDirectoryCalculator {
           .anyMatch(excluded -> isUnderRootDirectory(excluded, sourcePath))) {
         continue;
       }
-      WorkspacePath foundWorkspacePath =
-          importRoots.rootDirectories().stream()
-              .filter(rootDirectory -> isUnderRootDirectory(rootDirectory, sourcePath))
-              .findFirst()
-              .orElse(null);
-
-      if (foundWorkspacePath != null) {
-        result.put(foundWorkspacePath, sourceArtifact);
-      } else if (sourceArtifact.artifactLocation.isSource()) {
-        ArtifactLocation sourceFile = sourceArtifact.artifactLocation;
-        String message =
-            String.format(
-                "Did not add %s. You're probably using a java file from outside the workspace"
-                    + " that has been exported using export_files. Don't do that.",
-                sourceFile);
-        IssueOutput.warn(message).submit(context);
-      }
+      importRoots.rootDirectories().stream()
+          .filter(rootDirectory -> isUnderRootDirectory(rootDirectory, sourcePath))
+          .findFirst()
+          .ifPresent(foundWorkspacePath -> result.put(foundWorkspacePath, sourceArtifact));
     }
     return result;
   }
@@ -217,9 +201,8 @@ public final class SourceDirectoryCalculator {
         javaPackageReaders,
         result);
 
-    if (result.isEmpty() && PackagePrefixCalculator.looksLikeSourceRoot(directoryRoot)) {
-      // if this really looks like a source root, but we didn't find any sources
-      // then call it a root and guess the package path anyway
+    if (result.isEmpty()) {
+      // if there are no nested source directories, then mark the content root as a source directory
       return ImmutableList.of(
           BlazeSourceDirectory.builder(workspaceRoot.fileForPath(directoryRoot))
               .setPackagePrefix(PackagePrefixCalculator.packagePrefixOf(directoryRoot))

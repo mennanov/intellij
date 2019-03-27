@@ -22,7 +22,6 @@ import com.google.idea.blaze.base.projectview.ProjectViewSet;
 import com.google.idea.blaze.base.projectview.section.sections.BuildFlagsSection;
 import com.google.idea.blaze.base.projectview.section.sections.SyncFlagsSection;
 import com.google.idea.blaze.base.projectview.section.sections.TestFlagsSection;
-import com.google.idea.common.experiments.BoolExperiment;
 import com.intellij.execution.configurations.ParametersList;
 import com.intellij.openapi.project.Project;
 import com.intellij.util.PlatformUtils;
@@ -30,10 +29,6 @@ import java.util.List;
 
 /** The collection of all the Bazel flag strings we use. */
 public final class BlazeFlags {
-
-  private static final BoolExperiment macroExpandBuildFlags =
-      new BoolExperiment("macro.expand.blaze.flags", true);
-
   // Build the maximum number of possible dependencies of the project and to show all the build
   // errors in single go.
   public static final String KEEP_GOING = "--keep_going";
@@ -41,14 +36,17 @@ public final class BlazeFlags {
   // It expands to: --test_arg=--wrapper_script_flag=--debug --test_output=streamed
   //   --test_strategy=exclusive --test_timeout=9999 --nocache_test_results
   public static final String JAVA_TEST_DEBUG = "--java_debug";
-  // Runs tests locally, in sequence (rather than parallel), and streams their results to stdout.
+  // Streams stdout/stderr output from each test in real-time.
+  // Implies --test_strategy=exclusive and --test_sharding_strategy=disabled
   public static final String TEST_OUTPUT_STREAMED = "--test_output=streamed";
+  // Runs tests locally, in sequence (rather than parallel).
+  public static final String EXCLUSIVE_TEST_EXECUTION = "--test_strategy=exclusive";
+  // No sharding of tests
   public static final String DISABLE_TEST_SHARDING = "--test_sharding_strategy=disabled";
   // Filters the unit tests that are run (used with regexp for Java/Robolectric tests).
   public static final String TEST_FILTER = "--test_filter";
   // Re-run the test even if the results are cached.
   public static final String NO_CACHE_TEST_RESULTS = "--nocache_test_results";
-  public static final String LOCAL_TEST_EXECUTION = "--test_strategy=local";
 
   public static final String EXPERIMENTAL_SHOW_ARTIFACTS = "--experimental_show_artifacts";
 
@@ -113,11 +111,8 @@ public final class BlazeFlags {
 
   /** Expands any macros in the passed build flags. */
   public static List<String> expandBuildFlags(List<String> flags) {
-    if (!macroExpandBuildFlags.getValue()) {
-      return flags;
-    }
     // This built-in IntelliJ class will do macro expansion using
-    // both your enviroment and your Settings > Behavior > Path Variables
+    // both your environment and your Settings > Behavior > Path Variables
     ParametersList parametersList = new ParametersList();
     parametersList.addAll(flags);
     return parametersList.getList();

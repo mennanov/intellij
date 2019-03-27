@@ -18,11 +18,13 @@ package com.google.idea.blaze.java.fastbuild;
 import static com.google.common.base.Preconditions.checkState;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toSet;
 
 import com.google.common.base.Stopwatch;
 import com.google.common.collect.ImmutableList;
 import com.google.common.reflect.Reflection;
+import com.google.idea.blaze.base.logging.EventLoggingService;
+import com.google.idea.blaze.base.logging.EventLoggingService.Command;
+import com.google.idea.blaze.base.logging.NoopEventLoggingService;
 import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.scope.BlazeContext;
@@ -34,7 +36,6 @@ import com.google.idea.blaze.base.sync.data.BlazeProjectDataManager;
 import com.google.idea.blaze.java.fastbuild.FastBuildBlazeData.JavaToolchainInfo;
 import com.google.idea.blaze.java.fastbuild.FastBuildCompiler.CompileInstructions;
 import com.google.idea.blaze.java.fastbuild.FastBuildLogDataScope.FastBuildLogOutput;
-import com.google.idea.common.experiments.BoolExperiment;
 import com.intellij.ide.plugins.IdeaPluginDescriptor;
 import com.intellij.ide.plugins.PluginManager;
 import com.intellij.openapi.diagnostic.Logger;
@@ -48,10 +49,11 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Supplier;
 import javax.tools.Diagnostic;
 import javax.tools.Diagnostic.Kind;
@@ -67,33 +69,30 @@ final class FastBuildCompilerFactoryImpl implements FastBuildCompilerFactory {
       "com.google.idea.blaze.java.fastbuild.FastBuildJavacImpl";
   private static final Path FAST_BUILD_JAVAC_JAR = Paths.get("lib", "libfast_build_javac.jar");
 
-  private static final BoolExperiment useNewCompilerExperiment =
-      new BoolExperiment("use.new.fast.run.compiler", true);
-
   private final BlazeProjectDataManager projectDataManager;
-  private final Supplier<Boolean> useNewCompiler;
+  private final Supplier<EventLoggingService> eventLoggerSupplier;
   private final Supplier<File> fastBuildJavacJarSupplier;
 
   private FastBuildCompilerFactoryImpl(
       BlazeProjectDataManager projectDataManager,
-      Supplier<Boolean> useNewCompiler,
+      Supplier<EventLoggingService> eventLoggerSupplier,
       Supplier<File> fastBuildJavacJarSupplier) {
     this.projectDataManager = projectDataManager;
-    this.useNewCompiler = useNewCompiler;
+    this.eventLoggerSupplier = eventLoggerSupplier;
     this.fastBuildJavacJarSupplier = fastBuildJavacJarSupplier;
   }
 
   FastBuildCompilerFactoryImpl(BlazeProjectDataManager projectDataManager) {
     this(
         projectDataManager,
-        useNewCompilerExperiment::getValue,
+        EventLoggingService::getInstance,
         FastBuildCompilerFactoryImpl::findFastBuildJavacJar);
   }
 
   static FastBuildCompilerFactoryImpl createForTest(
-      BlazeProjectDataManager projectDataManager, boolean useNewCompiler, File fastBuildJavacJar) {
+      BlazeProjectDataManager projectDataManager, File fastBuildJavacJar) {
     return new FastBuildCompilerFactoryImpl(
-        projectDataManager, () -> useNewCompiler, () -> fastBuildJavacJar);
+        projectDataManager, NoopEventLoggingService::new, () -> fastBuildJavacJar);
   }
 
   @Override
@@ -105,14 +104,14 @@ final class FastBuildCompilerFactoryImpl implements FastBuildCompilerFactory {
     BlazeProjectData projectData = projectDataManager.getBlazeProjectData();
     checkState(projectData != null, "not a blaze project");
     File javacJar = projectData.getArtifactLocationDecoder().decode(javaToolchain.javacJar());
-    Javac javac = useNewCompiler.get() ? createNewCompiler(javacJar) : createOldCompiler(javacJar);
+    Javac javac = createCompiler(javacJar);
     return new JavacRunner(javac, javaToolchain.sourceVersion(), javaToolchain.targetVersion());
   }
 
   private JavaToolchainInfo getJavaToolchain(Label label, Map<Label, FastBuildBlazeData> blazeData)
       throws FastBuildException {
     FastBuildBlazeData targetData = blazeData.get(label);
-    List<JavaToolchainInfo> javaToolchains = new ArrayList<>();
+    Set<JavaToolchainInfo> javaToolchains = new HashSet<>();
     for (Label dependency : targetData.dependencies()) {
       FastBuildBlazeData depInfo = blazeData.get(dependency);
       if (depInfo != null && depInfo.javaToolchainInfo().isPresent()) {
@@ -127,8 +126,7 @@ final class FastBuildCompilerFactoryImpl implements FastBuildCompilerFactory {
       throw new FastBuildException(
           "Found multiple Java toolchains for target " + targetData.label());
     }
-
-    return javaToolchains.get(0);
+    return javaToolchains.iterator().next();
   }
 
   @FunctionalInterface
@@ -141,31 +139,7 @@ final class FastBuildCompilerFactoryImpl implements FastBuildCompilerFactory {
         throws FastBuildException;
   }
 
-  private Javac createOldCompiler(File javacJar) throws FastBuildException {
-    try {
-      Class<?> javacClass = loadJavacClass(JAVAC_CLASS, javacJar);
-      Object javacObject = javacClass.getDeclaredConstructor().newInstance();
-      Method compileMethod = javacClass.getMethod("compile", String[].class, PrintWriter.class);
-      return (context, javacArgs, files, writer) -> {
-        List<String> args =
-            ImmutableList.<String>builder()
-                .addAll(javacArgs)
-                .addAll(files.stream().map(File::getPath).collect(toSet()))
-                .build();
-        try {
-          Integer result =
-              (Integer) compileMethod.invoke(javacObject, args.toArray(new String[0]), writer);
-          return result == 0;
-        } catch (ReflectiveOperationException e) {
-          throw new FastBuildException(e);
-        }
-      };
-    } catch (MalformedURLException | ReflectiveOperationException e) {
-      throw new FastBuildException(e);
-    }
-  }
-
-  private Javac createNewCompiler(File javacJar) throws FastBuildException {
+  private Javac createCompiler(File javacJar) throws FastBuildException {
     try {
       Class<?> javacClass =
           loadJavacClass(FAST_BUILD_JAVAC_CLASS, javacJar, fastBuildJavacJarSupplier.get());
@@ -176,10 +150,23 @@ final class FastBuildCompilerFactoryImpl implements FastBuildCompilerFactory {
       FastBuildJavac javaCompiler =
           Reflection.newProxy(
               FastBuildJavac.class, new MatchingMethodInvocationHandler(javacClass, javacInstance));
-      return (context, javacArgs, files, writer) ->
-          javaCompiler.compile(javacArgs, files, new ProblemsViewDiagnosticListener(context));
+      return (context, javacArgs, files, writer) -> {
+        Stopwatch timer = Stopwatch.createStarted();
+        boolean result =
+            javaCompiler.compile(javacArgs, files, new ProblemsViewDiagnosticListener(context));
+        Command command =
+            Command.builder()
+                .setExecutable(javacJar.getPath())
+                .setArguments(javacArgs)
+                .setExitCode(result ? 0 : 1)
+                .setSubcommandName("javac")
+                .setDuration(timer.elapsed())
+                .build();
+        eventLoggerSupplier.get().logCommand(getClass(), command);
+        return result;
+      };
     } catch (MalformedURLException | ReflectiveOperationException e) {
-      throw new FastBuildException(e);
+      throw new FastBuildIncrementalCompileException(e);
     }
   }
 

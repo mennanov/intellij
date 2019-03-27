@@ -44,7 +44,7 @@ def _generate_test_suite_impl(ctx):
     lines.append("}")
 
     contents = "\n".join(lines)
-    ctx.file_action(
+    ctx.actions.write(
         output = ctx.outputs.out,
         content = contents,
     )
@@ -200,5 +200,5 @@ def _get_test_srcs(targets):
     """Returns all files of the given targets that end with Test.java."""
     files = depset()
     for target in targets:
-        files += target.files
+        files = depset(transitive = [files, target.files])
     return [f for f in files.to_list() if f.basename.endswith("Test.java")]

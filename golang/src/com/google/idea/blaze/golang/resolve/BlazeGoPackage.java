@@ -35,6 +35,7 @@ import com.google.idea.blaze.base.lang.buildfile.psi.BuildFile;
 import com.google.idea.blaze.base.lang.buildfile.psi.FuncallExpression;
 import com.google.idea.blaze.base.lang.buildfile.references.BuildReferenceManager;
 import com.google.idea.blaze.base.model.BlazeProjectData;
+import com.google.idea.blaze.base.model.primitives.GenericBlazeRules;
 import com.google.idea.blaze.base.model.primitives.Kind;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.model.primitives.LanguageClass;
@@ -43,7 +44,6 @@ import com.google.idea.blaze.base.sync.SyncCache;
 import com.google.idea.blaze.base.sync.workspace.WorkspaceHelper;
 import com.google.idea.blaze.base.targetmaps.ReverseDependencyMap;
 import com.google.idea.blaze.golang.GoBlazeRules.RuleTypes;
-import com.google.idea.sdkcompat.golang.GoPackageCompatAdapter;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -75,13 +75,13 @@ import javax.annotation.Nullable;
  *
  * Exactly one {@link BlazeGoPackage} per go rule.
  */
-public class BlazeGoPackage extends GoPackageCompatAdapter {
+public class BlazeGoPackage extends GoPackage {
   private static final String GO_LIBRARY_TO_TEST_MAP_KEY = "BlazeGoLibraryToTestMap";
 
   private final String importPath;
   private final Label label;
   private final Collection<File> files;
-  @Nullable private transient Collection<GoFile> cachedGoFiles;
+  @Nullable private transient Collection<PsiFile> cachedGoFiles;
   @Nullable private transient PsiElement cachedNavigable;
   @Nullable private transient PsiElement[] cachedImportReferences;
 
@@ -90,15 +90,14 @@ public class BlazeGoPackage extends GoPackageCompatAdapter {
     return create(
         project,
         importPath,
-        target.getKind().getRuleType().equals(RuleType.TEST),
         replaceProtoLibrary(project, projectData, target.getKey()).getLabel(),
         getSourceFiles(target, project, projectData));
   }
 
   static BlazeGoPackage create(
-      Project project, String importPath, boolean isTest, Label label, Collection<File> files) {
+      Project project, String importPath, Label label, Collection<File> files) {
     return new BlazeGoPackage(
-        project, getPackageName(project, files, importPath), importPath, isTest, label, files);
+        project, getPackageName(project, files, importPath), importPath, label, files);
   }
 
   /**
@@ -109,10 +108,7 @@ public class BlazeGoPackage extends GoPackageCompatAdapter {
       Project project, BlazeProjectData projectData, TargetKey targetKey) {
     TargetMap targetMap = projectData.getTargetMap();
     TargetIdeInfo target = targetMap.get(targetKey);
-    if (target == null
-        || target.getKind()
-            != com.google.idea.blaze.base.model.primitives.GenericBlazeRules.RuleTypes.PROTO_LIBRARY
-                .getKind()) {
+    if (target == null || target.getKind() != GenericBlazeRules.RuleTypes.PROTO_LIBRARY.getKind()) {
       return targetKey;
     }
     return ReverseDependencyMap.get(project).get(targetKey).stream()
@@ -172,13 +168,8 @@ public class BlazeGoPackage extends GoPackageCompatAdapter {
   }
 
   private BlazeGoPackage(
-      Project project,
-      String packageName,
-      String importPath,
-      boolean isTest,
-      Label label,
-      Collection<File> files) {
-    super(project, packageName, isTest, getDirectories(files));
+      Project project, String packageName, String importPath, Label label, Collection<File> files) {
+    super(project, packageName, getDirectories(files));
     this.importPath = importPath;
     this.label = label;
     this.files = files;
@@ -223,8 +214,7 @@ public class BlazeGoPackage extends GoPackageCompatAdapter {
   }
 
   @Override
-  @SuppressWarnings({"rawtypes", "unchecked"}) // #api182: return signature changed in 2018.3
-  public Collection files() {
+  public Collection<PsiFile> files() {
     if (cachedGoFiles == null) {
       PsiManager psiManager = PsiManager.getInstance(getProject());
       cachedGoFiles =

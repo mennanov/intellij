@@ -12,22 +12,30 @@ load(
     "intellij_unit_test_suite",
     "intellij_integration_test_suite",
 )
+load("//intellij_platform_sdk:build_defs.bzl", "select_for_ide")
 
 java_library(
     name = "javascript",
     srcs = glob(["src/**/*.java"]),
     visibility = ["//visibility:public"],
-    exports = [
-        "//plugin_dev",
-    ],
     deps = [
         "//base",
         "//common/experiments",
-        "//intellij_platform_sdk:jsr305",
-        "//intellij_platform_sdk:plugin_api",
         "//sdkcompat",
         "//third_party/javascript",
-    ],
+        "//intellij_platform_sdk:plugin_api",
+        "//intellij_platform_sdk:jsr305",
+    ] + select_for_ide(
+        intellij = [":webcore"],
+        intellij_ue = [],
+    ),
+)
+
+java_library(
+    name = "webcore",
+    srcs = glob(["webcore/src/**/*.java"]),
+    neverlink = 1,
+    deps = ["//intellij_platform_sdk:plugin_api"],
 )
 
 filegroup(
@@ -83,6 +91,7 @@ intellij_unit_test_suite(
         "//common/experiments:unit_test_utils",
         "//intellij_platform_sdk:jsr305",
         "//intellij_platform_sdk:plugin_api_for_tests",
+        "//intellij_platform_sdk:test_libs",
         "@junit//jar",
     ],
 )
@@ -101,6 +110,7 @@ intellij_integration_test_suite(
         "//base:unit_test_utils",
         "//intellij_platform_sdk:jsr305",
         "//intellij_platform_sdk:plugin_api_for_tests",
+        "//intellij_platform_sdk:test_libs",
         "//java",
         "//third_party/javascript:javascript_for_tests",
         "@junit//jar",

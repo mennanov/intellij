@@ -15,23 +15,64 @@
  */
 package com.google.idea.blaze.java.run.producers;
 
+import com.google.auto.value.AutoValue;
 import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.psi.PsiClass;
+import java.util.Arrays;
+import java.util.Objects;
+import javax.annotation.Nullable;
 
 /** A heuristic to recognize JUnit test runner classes which have parameterized test cases. */
 public interface JUnitParameterizedClassHeuristic {
 
+  String STANDARD_JUNIT_TEST_SUFFIX = "(\\[.+\\])?";
+  String USER_SPECIFIED_TEST_SUFFIX = ".*";
+
+  /** Information about the parameterized test. */
+  @AutoValue
+  abstract class ParameterizedTestInfo {
+    public abstract String runnerClass();
+
+    @Nullable
+    public abstract String testClassSuffixRegex();
+
+    public abstract String testMethodSuffixRegex();
+
+    public static ParameterizedTestInfo create(String runnerClass, String testMethodSuffixRegex) {
+      return builder()
+          .runnerClass(runnerClass)
+          .testMethodSuffixRegex(testMethodSuffixRegex)
+          .build();
+    }
+
+    public static Builder builder() {
+      return new AutoValue_JUnitParameterizedClassHeuristic_ParameterizedTestInfo.Builder();
+    }
+
+    @AutoValue.Builder
+    public abstract static class Builder {
+      public abstract Builder runnerClass(String runnerClass);
+
+      public abstract Builder testClassSuffixRegex(@Nullable String testClassSuffixRegex);
+
+      public abstract Builder testMethodSuffixRegex(String testMethodSuffixRegex);
+
+      public abstract ParameterizedTestInfo build();
+    }
+  }
+
   ExtensionPointName<JUnitParameterizedClassHeuristic> EP_NAME =
       ExtensionPointName.create("com.google.idea.blaze.JUnitParameterizedClassHeuristic");
 
-  static boolean isParameterizedTest(PsiClass psiClass) {
-    for (JUnitParameterizedClassHeuristic heuristic : EP_NAME.getExtensions()) {
-      if (heuristic.isParameterized(psiClass)) {
-        return true;
-      }
-    }
-    return false;
+  @Nullable
+  static ParameterizedTestInfo getParameterizedTestInfo(PsiClass psiClass) {
+    return Arrays.stream(EP_NAME.getExtensions())
+        .map(heuristic -> heuristic.getTestInfo(psiClass))
+        .filter(Objects::nonNull)
+        .findFirst()
+        .orElse(null);
   }
 
-  boolean isParameterized(PsiClass psiClass);
+  @Nullable
+  ParameterizedTestInfo getTestInfo(PsiClass psiClass);
 }

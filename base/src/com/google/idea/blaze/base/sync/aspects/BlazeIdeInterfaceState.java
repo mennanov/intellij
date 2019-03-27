@@ -21,48 +21,72 @@ import com.google.common.collect.HashBiMap;
 import com.google.common.collect.ImmutableBiMap;
 import com.google.common.collect.ImmutableMap;
 import com.google.devtools.intellij.model.ProjectData;
+import com.google.devtools.intellij.model.ProjectData.LocalFileOrOutputArtifact;
+import com.google.idea.blaze.base.filecache.ArtifactState;
 import com.google.idea.blaze.base.ideinfo.ProtoWrapper;
 import com.google.idea.blaze.base.ideinfo.TargetKey;
 import com.google.idea.blaze.base.model.SyncData;
 import com.google.idea.blaze.base.sync.projectview.WorkspaceLanguageSettings;
-import java.io.File;
 import java.util.Objects;
 import javax.annotation.Nullable;
 
 final class BlazeIdeInterfaceState implements SyncData<ProjectData.BlazeIdeInterfaceState> {
-  final ImmutableMap<File, Long> fileState;
-  final ImmutableBiMap<File, TargetKey> fileToTargetMapKey;
+
+  /**
+   * File strings here are any string uniquely identifying output artifacts. It's not used to
+   * re-derive an artifact location, though each artifact must map to a unique string.
+   */
+  final ImmutableMap<String, ArtifactState> ideInfoFileState;
+
+  final ImmutableBiMap<String, TargetKey> ideInfoFileToTargetKey;
   final WorkspaceLanguageSettings workspaceLanguageSettings;
-  final String aspectStrategyName;
 
   private BlazeIdeInterfaceState(
-      ImmutableMap<File, Long> fileState,
-      BiMap<File, TargetKey> fileToTargetMapKey,
-      WorkspaceLanguageSettings workspaceLanguageSettings,
-      String aspectStrategyName) {
-    this.fileState = fileState;
-    this.fileToTargetMapKey = ImmutableBiMap.copyOf(fileToTargetMapKey);
+      ImmutableMap<String, ArtifactState> ideInfoFileState,
+      BiMap<String, TargetKey> ideInfoFileToTargetKey,
+      WorkspaceLanguageSettings workspaceLanguageSettings) {
+    this.ideInfoFileState = ideInfoFileState;
+    this.ideInfoFileToTargetKey = ImmutableBiMap.copyOf(ideInfoFileToTargetKey);
     this.workspaceLanguageSettings = workspaceLanguageSettings;
-    this.aspectStrategyName = aspectStrategyName;
   }
 
   private static BlazeIdeInterfaceState fromProto(ProjectData.BlazeIdeInterfaceState proto) {
-    return new BlazeIdeInterfaceState(
-        ProtoWrapper.map(proto.getFileStateMap(), File::new, Functions.identity()),
+    ImmutableBiMap<String, TargetKey> targets =
         ImmutableBiMap.copyOf(
-            ProtoWrapper.map(proto.getFileToTargetMap(), File::new, TargetKey::fromProto)),
-        WorkspaceLanguageSettings.fromProto(proto.getWorkspaceLanguageSettings()),
-        proto.getAspectStrategyName());
+            ProtoWrapper.map(
+                proto.getFileToTargetMap(), Functions.identity(), TargetKey::fromProto));
+    if (proto.getIdeInfoFilesCount() == 0) {
+      // handle older version of proto
+      return new BlazeIdeInterfaceState(
+          ArtifactState.convertOldFormat(proto.getFileStateMap()),
+          targets,
+          WorkspaceLanguageSettings.fromProto(proto.getWorkspaceLanguageSettings()));
+    }
+    ImmutableMap.Builder<String, ArtifactState> artifacts = ImmutableMap.builder();
+    for (LocalFileOrOutputArtifact output : proto.getIdeInfoFilesList()) {
+      ArtifactState state = ArtifactState.fromProto(output);
+      if (state == null) {
+        continue;
+      }
+      artifacts.put(state.getKey(), state);
+    }
+    return new BlazeIdeInterfaceState(
+        artifacts.build(),
+        targets,
+        WorkspaceLanguageSettings.fromProto(proto.getWorkspaceLanguageSettings()));
   }
 
   @Override
   public ProjectData.BlazeIdeInterfaceState toProto() {
-    return ProjectData.BlazeIdeInterfaceState.newBuilder()
-        .putAllFileState(ProtoWrapper.map(fileState, File::getPath, Functions.identity()))
-        .putAllFileToTarget(ProtoWrapper.map(fileToTargetMapKey, File::getPath, TargetKey::toProto))
-        .setWorkspaceLanguageSettings(workspaceLanguageSettings.toProto())
-        .setAspectStrategyName(aspectStrategyName)
-        .build();
+    ProjectData.BlazeIdeInterfaceState.Builder proto =
+        ProjectData.BlazeIdeInterfaceState.newBuilder()
+            .putAllFileToTarget(
+                ProtoWrapper.map(ideInfoFileToTargetKey, Functions.identity(), TargetKey::toProto))
+            .setWorkspaceLanguageSettings(workspaceLanguageSettings.toProto());
+    for (String key : ideInfoFileState.keySet()) {
+      proto.addIdeInfoFiles(ideInfoFileState.get(key).serializeToProto());
+    }
+    return proto.build();
   }
 
   @Override
@@ -74,16 +98,14 @@ final class BlazeIdeInterfaceState implements SyncData<ProjectData.BlazeIdeInter
       return false;
     }
     BlazeIdeInterfaceState that = (BlazeIdeInterfaceState) o;
-    return Objects.equals(fileState, that.fileState)
-        && Objects.equals(fileToTargetMapKey, that.fileToTargetMapKey)
-        && Objects.equals(workspaceLanguageSettings, that.workspaceLanguageSettings)
-        && Objects.equals(aspectStrategyName, that.aspectStrategyName);
+    return Objects.equals(ideInfoFileState, that.ideInfoFileState)
+        && Objects.equals(ideInfoFileToTargetKey, that.ideInfoFileToTargetKey)
+        && Objects.equals(workspaceLanguageSettings, that.workspaceLanguageSettings);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(
-        fileState, fileToTargetMapKey, workspaceLanguageSettings, aspectStrategyName);
+    return Objects.hash(ideInfoFileState, ideInfoFileToTargetKey, workspaceLanguageSettings);
   }
 
   static Builder builder() {
@@ -91,14 +113,13 @@ final class BlazeIdeInterfaceState implements SyncData<ProjectData.BlazeIdeInter
   }
 
   static class Builder {
-    ImmutableMap<File, Long> fileState = null;
-    BiMap<File, TargetKey> fileToTargetMapKey = HashBiMap.create();
+    ImmutableMap<String, ArtifactState> ideInfoFileState = null;
+    BiMap<String, TargetKey> ideInfoToTargetKey = HashBiMap.create();
     WorkspaceLanguageSettings workspaceLanguageSettings;
-    String aspectStrategyName;
 
     BlazeIdeInterfaceState build() {
       return new BlazeIdeInterfaceState(
-          fileState, fileToTargetMapKey, workspaceLanguageSettings, aspectStrategyName);
+          ideInfoFileState, ideInfoToTargetKey, workspaceLanguageSettings);
     }
   }
 

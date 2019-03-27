@@ -16,8 +16,8 @@
 package com.google.idea.blaze.android.run.binary;
 
 import com.android.ddmlib.IDevice;
-import com.android.tools.idea.flags.StudioFlags;
 import com.android.tools.idea.gradle.util.DynamicAppUtils;
+import com.android.tools.idea.run.ApkFileUnit;
 import com.android.tools.idea.run.ApkInfo;
 import com.android.tools.idea.run.ApkProvisionException;
 import com.android.tools.idea.run.ApplicationIdProvider;
@@ -28,17 +28,18 @@ import com.android.tools.idea.run.activity.DefaultStartActivityFlagsProvider;
 import com.android.tools.idea.run.activity.StartActivityFlagsProvider;
 import com.android.tools.idea.run.editor.AndroidDebugger;
 import com.android.tools.idea.run.editor.AndroidDebuggerState;
-import com.android.tools.idea.run.tasks.ApplyCodeChangesAction;
+import com.android.tools.idea.run.tasks.ApplyChangesTask;
+import com.android.tools.idea.run.tasks.ApplyCodeChangesTask;
 import com.android.tools.idea.run.tasks.DebugConnectorTask;
-import com.android.tools.idea.run.tasks.DeployApkTask;
-import com.android.tools.idea.run.tasks.InstallAction;
+import com.android.tools.idea.run.tasks.DeployTask;
 import com.android.tools.idea.run.tasks.LaunchTask;
 import com.android.tools.idea.run.tasks.LaunchTasksProvider;
-import com.android.tools.idea.run.tasks.UnifiedDeployTask;
 import com.android.tools.idea.run.ui.ApplyChangesAction;
 import com.android.tools.idea.run.ui.CodeSwapAction;
 import com.android.tools.idea.run.util.ProcessHandlerLaunchStatus;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import com.google.idea.blaze.android.run.DeployTaskCompat;
 import com.google.idea.blaze.android.run.deployinfo.BlazeAndroidDeployInfo;
 import com.google.idea.blaze.android.run.deployinfo.BlazeApkProvider;
 import com.google.idea.blaze.android.run.runner.BlazeAndroidDeviceSelector;
@@ -63,7 +64,7 @@ import org.jetbrains.android.facet.AndroidFacet;
 import org.jetbrains.annotations.NotNull;
 
 /** Run context for android_binary. */
-class BlazeAndroidBinaryNormalBuildRunContext implements BlazeAndroidRunContext {
+public class BlazeAndroidBinaryNormalBuildRunContext implements BlazeAndroidRunContext {
   private static final BoolExperiment updateCodeViaJvmti =
       new BoolExperiment("android.apply.changes", false);
 
@@ -145,27 +146,27 @@ class BlazeAndroidBinaryNormalBuildRunContext implements BlazeAndroidRunContext 
       throw new ExecutionException(e);
     }
 
-    if (updateCodeViaJvmti.getValue() && StudioFlags.JVMTI_REFRESH.get()) {
-      UnifiedDeployTask.Builder builder = UnifiedDeployTask.builder().setProject(project);
-
+    if (updateCodeViaJvmti.getValue()) {
       // Add packages to the deployment, filtering out any dynamic features that are disabled.
+      ImmutableMap.Builder<String, List<File>> packages = ImmutableMap.builder();
       for (ApkInfo apkInfo : apks) {
-        builder.addPackage(
+        packages.put(
             apkInfo.getApplicationId(),
             getFilteredFeatures(apkInfo, launchOptions.getDisabledDynamicFeatures()));
       }
 
       // Set the appropriate action based on which deployment we're doing.
       if (Boolean.TRUE.equals(env.getCopyableUserData(ApplyChangesAction.KEY))) {
-        builder.setAction(new com.android.tools.idea.run.tasks.ApplyChangesAction());
+        return ImmutableList.of(new ApplyChangesTask(project, packages.build()));
       } else if (Boolean.TRUE.equals(env.getCopyableUserData(CodeSwapAction.KEY))) {
-        builder.setAction(new ApplyCodeChangesAction());
+        return ImmutableList.of(new ApplyCodeChangesTask(project, packages.build()));
       } else {
-        builder.setAction(new InstallAction(launchOptions.getPmInstallOptions()));
+        return ImmutableList.of(
+            new DeployTask(project, packages.build(), launchOptions.getPmInstallOptions()));
       }
-      return ImmutableList.of(builder.build());
     } else {
-      return ImmutableList.of(new DeployApkTask(project, launchOptions, apks));
+      return ImmutableList.of(DeployTaskCompat.createDeployTask(project, launchOptions, apks));
+      // return ImmutableList.of(new DeployApkTask(project, launchOptions, apks));
     }
   }
 
@@ -228,11 +229,11 @@ class BlazeAndroidBinaryNormalBuildRunContext implements BlazeAndroidRunContext 
   }
 
   @NotNull
-  private static List<File> getFilteredFeatures(ApkInfo apkInfo, List<String> disabledFeatures) {
+  public static List<File> getFilteredFeatures(ApkInfo apkInfo, List<String> disabledFeatures) {
     if (apkInfo.getFiles().size() > 1) {
       return apkInfo.getFiles().stream()
           .filter(feature -> DynamicAppUtils.isFeatureEnabled(disabledFeatures, feature))
-          .map(file -> file.getApkFile())
+          .map(ApkFileUnit::getApkFile)
           .collect(Collectors.toList());
     } else {
       return ImmutableList.of(apkInfo.getFile());

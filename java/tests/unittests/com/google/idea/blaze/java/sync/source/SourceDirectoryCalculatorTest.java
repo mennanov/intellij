@@ -32,6 +32,7 @@ import com.google.idea.blaze.base.ideinfo.TargetKey;
 import com.google.idea.blaze.base.io.FileOperationProvider;
 import com.google.idea.blaze.base.io.InputStreamProvider;
 import com.google.idea.blaze.base.io.MockInputStreamProvider;
+import com.google.idea.blaze.base.model.RemoteOutputArtifacts;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.model.primitives.WorkspacePath;
 import com.google.idea.blaze.base.model.primitives.WorkspaceRoot;
@@ -45,6 +46,7 @@ import com.google.idea.blaze.base.settings.BuildSystem;
 import com.google.idea.blaze.base.sync.projectview.ImportRoots;
 import com.google.idea.blaze.base.sync.workspace.ArtifactLocationDecoder;
 import com.google.idea.blaze.base.sync.workspace.ArtifactLocationDecoderImpl;
+import com.google.idea.blaze.base.sync.workspace.MockArtifactLocationDecoder;
 import com.google.idea.blaze.base.sync.workspace.WorkspacePathResolverImpl;
 import com.google.idea.blaze.java.sync.model.BlazeContentEntry;
 import com.google.idea.blaze.java.sync.model.BlazeSourceDirectory;
@@ -73,7 +75,12 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
 
   private final WorkspaceRoot workspaceRoot = new WorkspaceRoot(new File("/root"));
   private final ArtifactLocationDecoder decoder =
-      artifactLocation -> new File("/root", artifactLocation.getRelativePath());
+      new MockArtifactLocationDecoder() {
+        @Override
+        public File decode(ArtifactLocation artifactLocation) {
+          return new File("/root", artifactLocation.getRelativePath());
+        }
+      };
 
   @Override
   protected void initTest(Container applicationServices, Container projectServices) {
@@ -125,7 +132,7 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
   }
 
   @Test
-  public void testRootDirectoryWithoutSourcesIsNotMarkedAsSourceRoot() {
+  public void testRootDirectoryWithoutNestedSourcesIsMarkedAsSourceRoot() {
     List<SourceArtifact> sourceArtifacts = ImmutableList.of();
     ImmutableList<BlazeContentEntry> result =
         sourceDirectoryCalculator.calculateContentEntries(
@@ -139,7 +146,13 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
             NO_MANIFESTS);
     issues.assertNoIssues();
     assertThat(result)
-        .containsExactly(BlazeContentEntry.builder("/root/some/innocuous/path").build());
+        .containsExactly(
+            BlazeContentEntry.builder("/root/some/innocuous/path")
+                .addSource(
+                    BlazeSourceDirectory.builder("/root/some/innocuous/path")
+                        .setPackagePrefix("some.innocuous.path")
+                        .build())
+                .build());
   }
 
   @Test
@@ -659,31 +672,6 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
   }
 
   @Test
-  public void testSourcesToSourceDirectories_sourcesOutsideOfModuleGeneratesIssue() {
-    mockInputStreamProvider.addFile(
-        "/root/java/com/facebook/Bla.java", "package com.facebook;\n public class Bla {}");
-    List<SourceArtifact> sourceArtifacts =
-        ImmutableList.of(
-            SourceArtifact.builder(TargetKey.forPlainTarget(LABEL))
-                .setArtifactLocation(
-                    ArtifactLocation.builder()
-                        .setRelativePath("java/com/facebook/Bla.java")
-                        .setIsSource(true))
-                .build());
-    sourceDirectoryCalculator.calculateContentEntries(
-        project,
-        context,
-        workspaceRoot,
-        decoder,
-        buildImportRoots(
-            ImmutableList.of(new WorkspacePath("java/com/google")), ImmutableList.of()),
-        sourceArtifacts,
-        NO_MANIFESTS);
-
-    issues.assertIssueContaining("Did not add");
-  }
-
-  @Test
   public void testSourcesToSourceDirectories_generatedSourcesOutsideOfModuleGeneratesNoIssue() {
     mockInputStreamProvider.addFile(
         "/root/java/com/facebook/Bla.java", "package com.facebook;\n public class Bla {}");
@@ -1001,7 +989,7 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
             TargetKey.forPlainTarget(LABEL),
             ArtifactLocation.builder()
                 .setRelativePath("java/com/test.manifest")
-                .setIsSource(true)
+                .setIsSource(false)
                 .build());
     Map<TargetKey, Map<ArtifactLocation, String>> manifestMap =
         readPackageManifestFiles(manifests, getDecoder());
@@ -1026,7 +1014,7 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
             TargetKey.forPlainTarget(LABEL),
             ArtifactLocation.builder()
                 .setRelativePath("java/com/test.manifest")
-                .setIsSource(true)
+                .setIsSource(false)
                 .build());
     Map<TargetKey, Map<ArtifactLocation, String>> manifestMap =
         readPackageManifestFiles(manifests, getDecoder());
@@ -1056,13 +1044,13 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
                 TargetKey.forPlainTarget(Label.create("//a:a")),
                 ArtifactLocation.builder()
                     .setRelativePath("java/com/test.manifest")
-                    .setIsSource(true)
+                    .setIsSource(false)
                     .build())
             .put(
                 TargetKey.forPlainTarget(Label.create("//b:b")),
                 ArtifactLocation.builder()
                     .setRelativePath("java/com/test2.manifest")
-                    .setIsSource(true)
+                    .setIsSource(false)
                     .build())
             .build();
     Map<TargetKey, Map<ArtifactLocation, String>> manifestMap =
@@ -1109,7 +1097,7 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
             TargetKey.forPlainTarget(LABEL),
             ArtifactLocation.builder()
                 .setRelativePath("java/com/test.manifest")
-                .setIsSource(true)
+                .setIsSource(false)
                 .build());
 
     List<SourceArtifact> sourceArtifacts =
@@ -1207,14 +1195,15 @@ public class SourceDirectoryCalculatorTest extends BlazeTestCase {
             "/root/out/crosstool/bin",
             "/root/out/crosstool/gen",
             "/root/out/crosstool/testlogs");
-    return new ArtifactLocationDecoderImpl(roots, new WorkspacePathResolverImpl(workspaceRoot));
+    return new ArtifactLocationDecoderImpl(
+        roots, new WorkspacePathResolverImpl(workspaceRoot), RemoteOutputArtifacts.EMPTY);
   }
 
   private Map<TargetKey, Map<ArtifactLocation, String>> readPackageManifestFiles(
       Map<TargetKey, ArtifactLocation> manifests, ArtifactLocationDecoder decoder) {
     return PackageManifestReader.getInstance()
         .readPackageManifestFiles(
-            project, context, decoder, manifests, MoreExecutors.newDirectExecutorService());
+            context, decoder, manifests, MoreExecutors.newDirectExecutorService());
   }
 
   static class MockFileOperationProvider extends FileOperationProvider {

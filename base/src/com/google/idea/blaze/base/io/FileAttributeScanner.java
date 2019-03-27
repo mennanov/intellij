@@ -19,37 +19,40 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
-import com.google.idea.blaze.base.async.executor.BlazeExecutor;
-import java.io.File;
+import com.google.common.util.concurrent.ListeningExecutorService;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import javax.annotation.Nullable;
 
 /** Reads file attributes from a list files in parallel. */
 public class FileAttributeScanner {
 
-  interface AttributeReader<T> {
-    T getAttribute(File file);
+  /** Reads an attribute from a file. */
+  public interface AttributeReader<F, T> {
+    @Nullable
+    T getAttribute(F file);
 
     boolean isValid(T attribute);
   }
 
-  public static <T> ImmutableMap<File, T> readAttributes(
-      Iterable<File> fileList, AttributeReader<T> attributeReader, BlazeExecutor executor)
-      throws Exception {
-    List<ListenableFuture<FilePair<T>>> futures = Lists.newArrayList();
-    for (File file : fileList) {
+  public static <F, T> ImmutableMap<F, T> readAttributes(
+      Iterable<F> files, AttributeReader<F, T> attributeReader, ListeningExecutorService executor)
+      throws InterruptedException, ExecutionException {
+    List<ListenableFuture<FilePair<F, T>>> futures = Lists.newArrayList();
+    for (F file : files) {
       futures.add(
           executor.submit(
               () -> {
                 T attribute = attributeReader.getAttribute(file);
-                if (attributeReader.isValid(attribute)) {
+                if (attribute != null && attributeReader.isValid(attribute)) {
                   return new FilePair<>(file, attribute);
                 }
                 return null;
               }));
     }
 
-    ImmutableMap.Builder<File, T> result = ImmutableMap.builder();
-    for (FilePair<T> filePair : Futures.allAsList(futures).get()) {
+    ImmutableMap.Builder<F, T> result = ImmutableMap.builder();
+    for (FilePair<F, T> filePair : Futures.allAsList(futures).get()) {
       if (filePair != null) {
         result.put(filePair.file, filePair.attribute);
       }
@@ -57,11 +60,11 @@ public class FileAttributeScanner {
     return result.build();
   }
 
-  private static class FilePair<T> {
-    public final File file;
+  private static class FilePair<F, T> {
+    public final F file;
     public final T attribute;
 
-    public FilePair(File file, T attribute) {
+    public FilePair(F file, T attribute) {
       this.file = file;
       this.attribute = attribute;
     }

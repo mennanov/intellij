@@ -17,10 +17,12 @@ package com.google.idea.blaze.clwb.run;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
+import com.google.idea.blaze.base.command.BlazeCommandName;
 import com.google.idea.blaze.base.command.BlazeInvocationContext;
 import com.google.idea.blaze.base.command.buildresult.BuildResultHelper;
 import com.google.idea.blaze.base.command.buildresult.BuildResultHelper.GetArtifactsException;
 import com.google.idea.blaze.base.command.buildresult.BuildResultHelperProvider;
+import com.google.idea.blaze.base.command.buildresult.LocalFileOutputArtifact;
 import com.google.idea.blaze.base.model.primitives.Label;
 import com.google.idea.blaze.base.run.BlazeBeforeRunCommandHelper;
 import com.google.idea.blaze.base.run.BlazeCommandRunConfiguration;
@@ -91,11 +93,12 @@ public class BlazeCidrRunConfigurationRunner implements BlazeCommandRunConfigura
    * @throws ExecutionException if no unique output artifact was found.
    */
   private File getExecutableToDebug(ExecutionEnvironment env) throws ExecutionException {
+    SaveUtil.saveAllFiles();
     try (BuildResultHelper buildResultHelper =
         BuildResultHelperProvider.forFiles(env.getProject(), file -> true)) {
 
       List<String> extraDebugFlags;
-      if (!BlazeCidrLauncher.useRemoteDebugging.getValue()) {
+      if (!BlazeCidrLauncher.shouldUseGdbserver()) {
         extraDebugFlags =
             ImmutableList.of(
                 "--compilation_mode=dbg",
@@ -106,12 +109,12 @@ public class BlazeCidrRunConfigurationRunner implements BlazeCommandRunConfigura
                 "--fission=yes");
       } else {
         extraDebugFlags =
-            BlazeCidrLauncher.getExtraFlagsForDebugging(
-                configuration.getHandler().getCommandName());
+            BlazeCidrLauncher.getExtraFlagsForDebugging(configuration.getHandler().getState());
       }
 
       ListenableFuture<BuildResult> buildOperation =
-          BlazeBeforeRunCommandHelper.runBlazeBuild(
+          BlazeBeforeRunCommandHelper.runBlazeCommand(
+              BlazeCommandName.BUILD,
               configuration,
               buildResultHelper,
               ImmutableList.of(),
@@ -121,7 +124,6 @@ public class BlazeCidrRunConfigurationRunner implements BlazeCommandRunConfigura
               "Building debug binary");
 
       try {
-        SaveUtil.saveAllFiles();
         BuildResult result = buildOperation.get();
         if (result.status != BuildResult.Status.SUCCESS) {
           throw new ExecutionException("Blaze failure building debug binary");
@@ -135,7 +137,9 @@ public class BlazeCidrRunConfigurationRunner implements BlazeCommandRunConfigura
       List<File> candidateFiles;
       try {
         candidateFiles =
-            buildResultHelper.getBuildArtifactsForTarget((Label) configuration.getTarget()).stream()
+            LocalFileOutputArtifact.getLocalOutputFiles(
+                    buildResultHelper.getBuildArtifactsForTarget((Label) configuration.getTarget()))
+                .stream()
                 .filter(File::canExecute)
                 .collect(Collectors.toList());
       } catch (GetArtifactsException e) {
