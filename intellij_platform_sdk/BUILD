@@ -144,6 +144,13 @@ config_setting(
     },
 )
 
+config_setting(
+    name = "clion-2019.1",
+    values = {
+        "define": "ij_product=clion-2019.1",
+    },
+)
+
 load(
     ":build_defs.bzl",
     "select_for_ide",
@@ -210,6 +217,16 @@ java_library(
     ],
 )
 
+# The UI designer requires forms_rt.jar in the classpath.
+java_library(
+    name = "forms_rt",
+    exports = select_from_plugin_api_directory(
+        android_studio = [":forms_rt"],
+        clion = [":forms_rt"],
+        intellij = [":forms_rt"],
+    ),
+)
+
 # The version of guava bundled with the IntelliJ plugin API.
 java_library(
     name = "guava",
@@ -237,6 +254,7 @@ java_library(
     name = "jsr305",
     exports = select_for_plugin_api({
         "clion-2018.3": ["@jsr305_annotations//jar"],
+        "clion-2019.1": ["@jsr305_annotations//jar"],
         "intellij-ue-2018.3": ["@jsr305_annotations//jar"],
         "intellij-ue-2019.1": ["@jsr305_annotations//jar"],
         "default": [":plugin_api"],

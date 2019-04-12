@@ -524,9 +524,14 @@ def collect_java_info(target, ctx, semantics, ide_info, ide_info_file, output_gr
         ]
 
     jdeps = None
-    if hasattr(java.outputs, "jdeps") and java.outputs.jdeps:
-        jdeps = artifact_location(java.outputs.jdeps)
-        resolve_files += [java.outputs.jdeps]
+    jdeps_file = None
+    if java_semantics and hasattr(java_semantics, "get_filtered_jdeps"):
+        jdeps_file = java_semantics.get_filtered_jdeps(target)
+    if jdeps_file == None and hasattr(java.outputs, "jdeps") and java.outputs.jdeps:
+        jdeps_file = java.outputs.jdeps
+    if jdeps_file:
+        jdeps = artifact_location(jdeps_file)
+        resolve_files.append(jdeps_file)
 
     java_sources, gen_java_sources, srcjars = divide_java_sources(ctx)
 
@@ -887,30 +892,33 @@ def semantics_extra_deps(base, semantics, name):
 def make_intellij_info_aspect(aspect_impl, semantics):
     """Creates the aspect given the semantics."""
     tool_label = semantics.tool_label
+    flag_hack_label = semantics.flag_hack_label
     deps = semantics_extra_deps(DEPS, semantics, "extra_deps")
     runtime_deps = semantics_extra_deps(RUNTIME_DEPS, semantics, "extra_runtime_deps")
     prerequisite_deps = semantics_extra_deps(PREREQUISITE_DEPS, semantics, "extra_prerequisites")
 
     attr_aspects = deps + runtime_deps + prerequisite_deps
 
+    attrs = {
+        "_package_parser": attr.label(
+            default = tool_label("PackageParser"),
+            cfg = "host",
+            executable = True,
+            allow_files = True,
+        ),
+        "_jar_filter": attr.label(
+            default = tool_label("JarFilter"),
+            cfg = "host",
+            executable = True,
+            allow_files = True,
+        ),
+        "_flag_hack": attr.label(
+            default = flag_hack_label,
+        ),
+    }
+
     return aspect(
-        attrs = {
-            "_package_parser": attr.label(
-                default = tool_label("PackageParser"),
-                cfg = "host",
-                executable = True,
-                allow_files = True,
-            ),
-            "_jar_filter": attr.label(
-                default = tool_label("JarFilter"),
-                cfg = "host",
-                executable = True,
-                allow_files = True,
-            ),
-            "_flag_hack": attr.label(
-                default = "//aspect:flag_hack",
-            ),
-        },
+        attrs = attrs,
         attr_aspects = attr_aspects,
         fragments = ["cpp"],
         implementation = aspect_impl,

@@ -25,7 +25,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.idea.blaze.base.BlazeTestCase;
 import java.util.List;
-import org.jetbrains.annotations.NotNull;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -90,12 +89,12 @@ public class BlazeContextTest extends BlazeTestCase {
     }
 
     @Override
-    public void onScopeBegin(@NotNull BlazeContext context) {
+    public void onScopeBegin(BlazeContext context) {
       record.add("begin" + id);
     }
 
     @Override
-    public void onScopeEnd(@NotNull BlazeContext context) {
+    public void onScopeEnd(BlazeContext context) {
       record.add("end" + id);
     }
   }
@@ -145,7 +144,7 @@ public class BlazeContextTest extends BlazeTestCase {
     public boolean gotOutput;
 
     @Override
-    public Propagation onOutput(@NotNull T output) {
+    public Propagation onOutput(T output) {
       gotOutput = true;
       return Propagation.Continue;
     }
@@ -206,12 +205,6 @@ public class BlazeContextTest extends BlazeTestCase {
     public StringScope(String s) {
       this.str = s;
     }
-
-    @Override
-    public void onScopeBegin(@NotNull BlazeContext context) {}
-
-    @Override
-    public void onScopeEnd(@NotNull BlazeContext context) {}
   }
 
   private static class CollectorScope implements BlazeScope {
@@ -223,10 +216,7 @@ public class BlazeContextTest extends BlazeTestCase {
     }
 
     @Override
-    public void onScopeBegin(@NotNull BlazeContext context) {}
-
-    @Override
-    public void onScopeEnd(@NotNull BlazeContext context) {
+    public void onScopeEnd(BlazeContext context) {
       List<StringScope> scopes = context.getScopes(StringScope.class, this);
       for (StringScope scope : scopes) {
         output.add(scope.str);
@@ -344,7 +334,7 @@ public class BlazeContextTest extends BlazeTestCase {
     boolean gotOutput;
 
     @Override
-    public Propagation onOutput(@NotNull TestOutput1 output) {
+    public Propagation onOutput(TestOutput1 output) {
       this.gotOutput = true;
       return Propagation.Stop;
     }

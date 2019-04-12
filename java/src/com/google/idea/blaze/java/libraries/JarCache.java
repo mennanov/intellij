@@ -30,6 +30,7 @@ import com.google.idea.blaze.base.filecache.FileCacheDiffer;
 import com.google.idea.blaze.base.ideinfo.ArtifactLocation;
 import com.google.idea.blaze.base.ideinfo.LibraryArtifact;
 import com.google.idea.blaze.base.io.FileOperationProvider;
+import com.google.idea.blaze.base.io.FileSizeScanner;
 import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.model.RemoteOutputArtifacts;
 import com.google.idea.blaze.base.prefetch.FetchExecutor;
@@ -86,13 +87,9 @@ public class JarCache {
   /** In-memory state representing the currently-cached files their corresponding artifacts. */
   private static class InMemoryState {
     private final ImmutableMap<String, OutputArtifact> projectOutputs;
-    private final ImmutableMap<String, File> cachedFiles;
 
-    InMemoryState(
-        ImmutableMap<String, OutputArtifact> projectOutputs,
-        ImmutableMap<String, File> cachedFiles) {
+    InMemoryState(ImmutableMap<String, OutputArtifact> projectOutputs) {
       this.projectOutputs = projectOutputs;
-      this.cachedFiles = cachedFiles;
     }
   }
 
@@ -183,15 +180,16 @@ public class JarCache {
       }
     }
 
+    ImmutableMap<String, File> cachedFiles = readCachedFiles();
     try {
       Map<String, OutputArtifact> updated =
           FileCacheDiffer.findUpdatedOutputs(
-              inMemoryState.projectOutputs, inMemoryState.cachedFiles, previousOutputs);
+              inMemoryState.projectOutputs, cachedFiles, previousOutputs);
 
       List<File> removed = new ArrayList<>();
       if (removeMissingFiles) {
         removed =
-            inMemoryState.cachedFiles.entrySet().stream()
+            cachedFiles.entrySet().stream()
                 .filter(e -> !inMemoryState.projectOutputs.containsKey(e.getKey()))
                 .map(Map.Entry::getValue)
                 .collect(toImmutableList());
@@ -210,6 +208,11 @@ public class JarCache {
       if (!removed.isEmpty()) {
         context.output(PrintOutput.log(String.format("Removed %d jars", removed.size())));
       }
+      ImmutableMap<File, Long> cacheFileSizes = FileSizeScanner.readFilesizes(cachedFiles.values());
+      long total = cacheFileSizes.values().stream().mapToLong(x -> x).sum();
+      String msg =
+          String.format("Total Jar Cache size: %d kB (%d files)", total / 1024, cachedFiles.size());
+      context.output(PrintOutput.log(msg));
 
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -238,7 +241,7 @@ public class JarCache {
         newOutputs.put(cacheKeyForSourceJar(srcJar), srcJar);
       }
     }
-    return new InMemoryState(ImmutableMap.copyOf(newOutputs), readCachedFiles());
+    return new InMemoryState(ImmutableMap.copyOf(newOutputs));
   }
 
   private Collection<ListenableFuture<?>> copyLocally(Map<String, OutputArtifact> updated) {
@@ -311,7 +314,7 @@ public class JarCache {
       return getFallbackFile(artifact);
     }
     String cacheKey = cacheKeyForJar(artifact);
-    return getCacheFile(cacheKey).orElse(getFallbackFile(artifact));
+    return getCacheFile(cacheKey).orElseGet(() -> getFallbackFile(artifact));
   }
 
   /** Gets the cached file for a source jar. */
@@ -322,12 +325,15 @@ public class JarCache {
       return getFallbackFile(artifact);
     }
     String cacheKey = cacheKeyForSourceJar(artifact);
-    return getCacheFile(cacheKey).orElse(getFallbackFile(artifact));
+    return getCacheFile(cacheKey).orElseGet(() -> getFallbackFile(artifact));
   }
 
   private Optional<File> getCacheFile(String cacheKey) {
     InMemoryState state = inMemoryState;
-    return Optional.ofNullable(state == null ? null : state.cachedFiles.get(cacheKey));
+    if (state == null || !state.projectOutputs.containsKey(cacheKey)) {
+      return Optional.empty();
+    }
+    return Optional.of(cacheFileForKey(cacheKey));
   }
 
   /** The file to return if there's no locally cached version. */

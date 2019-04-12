@@ -15,93 +15,58 @@
  */
 package com.google.idea.blaze.base.sync.aspects;
 
-import com.google.common.collect.ImmutableSet;
-import com.google.idea.blaze.base.command.buildresult.RemoteOutputArtifact;
-import com.google.idea.blaze.base.command.info.BlazeConfigurationHandler;
 import com.google.idea.blaze.base.command.info.BlazeInfo;
 import com.google.idea.blaze.base.ideinfo.TargetMap;
+import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.model.BlazeVersionData;
 import com.google.idea.blaze.base.model.SyncState;
 import com.google.idea.blaze.base.model.primitives.WorkspaceRoot;
 import com.google.idea.blaze.base.projectview.ProjectViewSet;
 import com.google.idea.blaze.base.scope.BlazeContext;
+import com.google.idea.blaze.base.sync.SyncProjectState;
 import com.google.idea.blaze.base.sync.projectview.WorkspaceLanguageSettings;
 import com.google.idea.blaze.base.sync.sharding.ShardedTargetList;
 import com.intellij.openapi.components.ServiceManager;
 import com.intellij.openapi.project.Project;
-import java.util.Collection;
 import javax.annotation.Nullable;
 
-/** Indirection between ide_build_info and aspect style IDE info. */
+/** A blaze build interface used for mocking out the blaze layer in tests. */
 public interface BlazeIdeInterface {
 
   static BlazeIdeInterface getInstance() {
     return ServiceManager.getService(BlazeIdeInterface.class);
   }
 
-  /** The result of the ide-info build step. */
-  class BuildResultIdeInfo {
-    @Nullable public final TargetMap targetMap;
-    public final ImmutableSet<RemoteOutputArtifact> remoteOutputs;
-    public final BuildResult buildResult;
-
-    public BuildResultIdeInfo(
-        @Nullable TargetMap targetMap,
-        ImmutableSet<RemoteOutputArtifact> remoteOutputs,
-        BuildResult buildResult) {
-      this.targetMap = targetMap;
-      this.remoteOutputs = remoteOutputs;
-      this.buildResult = buildResult;
-    }
-  }
-
-  /** The result of the ide-resolve build step. */
-  class BuildResultIdeResolve {
-    public final Collection<RemoteOutputArtifact> remoteOutputs;
-    public final BuildResult buildResult;
-
-    public BuildResultIdeResolve(
-        Collection<RemoteOutputArtifact> remoteOutputs, BuildResult buildResult) {
-      this.remoteOutputs = remoteOutputs;
-      this.buildResult = buildResult;
-    }
-  }
-
   /**
-   * Queries blaze to update the rule map for the given targets.
+   * Parses the output intellij-info.txt files, updating the project's {@link TargetMap} and
+   * BlazeIdeInterfaceState accordingly.
    *
    * @param mergeWithOldState If true, we overlay the given targets to the current rule map.
-   * @return A tuple of the latest updated rule map and the result of the operation.
    */
-  BuildResultIdeInfo updateTargetMap(
+  @Nullable
+  TargetMap updateTargetMap(
       Project project,
       BlazeContext context,
       WorkspaceRoot workspaceRoot,
-      ProjectViewSet projectViewSet,
-      BlazeInfo blazeInfo,
-      BlazeVersionData blazeVersionData,
-      BlazeConfigurationHandler configHandler,
-      ShardedTargetList shardedTargets,
-      WorkspaceLanguageSettings workspaceLanguageSettings,
+      SyncProjectState projectState,
+      BlazeBuildOutputs buildResult,
       SyncState.Builder syncStateBuilder,
-      @Nullable SyncState previousSyncState,
       boolean mergeWithOldState,
-      @Nullable TargetMap oldTargetMap);
+      @Nullable BlazeProjectData oldProjectData);
 
   /**
-   * Attempts to resolve the requested ide artifacts.
+   * The blaze build phase of sync.
    *
-   * <p>Amounts to a build of the ide-resolve output group.
+   * <p>Builds the 'ide-info-*' and 'ide-resolve-*' output groups.
    */
-  BuildResultIdeResolve resolveIdeArtifacts(
+  BlazeBuildOutputs buildIdeArtifacts(
       Project project,
       BlazeContext context,
       WorkspaceRoot workspaceRoot,
       ProjectViewSet projectViewSet,
       BlazeInfo blazeInfo,
-      BlazeVersionData blazeVersionData,
-      WorkspaceLanguageSettings workspaceLanguageSettings,
-      ShardedTargetList shardedTargets);
+      ShardedTargetList shardedTargets,
+      WorkspaceLanguageSettings workspaceLanguageSettings);
 
   /**
    * Attempts to compile the requested ide artifacts.

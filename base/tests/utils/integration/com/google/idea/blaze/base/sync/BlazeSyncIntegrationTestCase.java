@@ -19,20 +19,20 @@ import static com.google.common.truth.Truth.assertThat;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.idea.blaze.base.BlazeIntegrationTestCase;
 import com.google.idea.blaze.base.MockEventLoggingService;
 import com.google.idea.blaze.base.MockProjectViewManager;
-import com.google.idea.blaze.base.command.info.BlazeConfigurationHandler;
 import com.google.idea.blaze.base.command.info.BlazeInfo;
 import com.google.idea.blaze.base.command.info.BlazeInfoRunner;
 import com.google.idea.blaze.base.ideinfo.ArtifactLocation;
 import com.google.idea.blaze.base.ideinfo.TargetMap;
 import com.google.idea.blaze.base.logging.utils.SyncStats;
+import com.google.idea.blaze.base.model.BlazeProjectData;
 import com.google.idea.blaze.base.model.BlazeVersionData;
 import com.google.idea.blaze.base.model.SyncState;
 import com.google.idea.blaze.base.model.primitives.WorkspaceRoot;
@@ -44,6 +44,7 @@ import com.google.idea.blaze.base.scope.output.IssueOutput;
 import com.google.idea.blaze.base.settings.Blaze;
 import com.google.idea.blaze.base.settings.BlazeImportSettingsManager;
 import com.google.idea.blaze.base.settings.BuildSystem;
+import com.google.idea.blaze.base.sync.aspects.BlazeBuildOutputs;
 import com.google.idea.blaze.base.sync.aspects.BlazeIdeInterface;
 import com.google.idea.blaze.base.sync.aspects.BuildResult;
 import com.google.idea.blaze.base.sync.data.BlazeDataStorage;
@@ -189,7 +190,12 @@ public abstract class BlazeSyncIntegrationTestCase extends BlazeIntegrationTestC
     // Because the sync task itself wants to run occasional EDT tasks, we'll have
     // to keep flushing the event queue.
     Future<?> future =
-        Executors.newSingleThreadExecutor().submit(() -> syncTask.syncProject(context));
+        Executors.newSingleThreadExecutor()
+            .submit(
+                () -> {
+                  syncTask.syncProject(context);
+                  context.endScope();
+                });
     while (!future.isDone()) {
       IdeEventQueue.getInstance().flushQueue();
       try {
@@ -247,34 +253,28 @@ public abstract class BlazeSyncIntegrationTestCase extends BlazeIntegrationTestC
     private TargetMap targetMap = new TargetMap(ImmutableMap.of());
 
     @Override
-    public BuildResultIdeInfo updateTargetMap(
+    public BlazeBuildOutputs buildIdeArtifacts(
         Project project,
         BlazeContext context,
         WorkspaceRoot workspaceRoot,
         ProjectViewSet projectViewSet,
         BlazeInfo blazeInfo,
-        BlazeVersionData blazeVersionData,
-        BlazeConfigurationHandler configHandler,
         ShardedTargetList shardedTargets,
-        WorkspaceLanguageSettings workspaceLanguageSettings,
-        SyncState.Builder syncStateBuilder,
-        @Nullable SyncState previousSyncState,
-        boolean mergeWithOldState,
-        @Nullable TargetMap oldTargetMap) {
-      return new BuildResultIdeInfo(targetMap, ImmutableSet.of(), BuildResult.SUCCESS);
+        WorkspaceLanguageSettings workspaceLanguageSettings) {
+      return new BlazeBuildOutputs(ImmutableListMultimap.of(), BuildResult.SUCCESS);
     }
 
     @Override
-    public BuildResultIdeResolve resolveIdeArtifacts(
+    public TargetMap updateTargetMap(
         Project project,
         BlazeContext context,
         WorkspaceRoot workspaceRoot,
-        ProjectViewSet projectViewSet,
-        BlazeInfo blazeInfo,
-        BlazeVersionData blazeVersionData,
-        WorkspaceLanguageSettings workspaceLanguageSettings,
-        ShardedTargetList shardedTargets) {
-      return new BuildResultIdeResolve(ImmutableSet.of(), BuildResult.SUCCESS);
+        SyncProjectState projectState,
+        BlazeBuildOutputs buildResult,
+        SyncState.Builder syncStateBuilder,
+        boolean mergeWithOldState,
+        @Nullable BlazeProjectData oldProjectData) {
+      return targetMap;
     }
 
     @Override

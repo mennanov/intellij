@@ -11,8 +11,8 @@ load("@bazel_tools//tools/build_defs/repo:jvm.bzl", "jvm_maven_import_external")
 http_archive(
     name = "intellij_ce_2018_3",
     build_file = "@//intellij_platform_sdk:BUILD.idea",
-    sha256 = "8eb5a2a2544607b2b052c5961475528a3f981333b301e0e17ad0e76eec8ac6a8",
-    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIC/2018.3.5/ideaIC-2018.3.5.zip",
+    sha256 = "b2390d64269ca4d4a7fcd856a29e5b2d1a81f40451f135b092f9f97f046b8f35",
+    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIC/2018.3.6/ideaIC-2018.3.6.zip",
 )
 
 # The plugin api for IntelliJ 2019.1. This is required to build IJwB,
@@ -20,8 +20,8 @@ http_archive(
 http_archive(
     name = "intellij_ce_2019_1",
     build_file = "@//intellij_platform_sdk:BUILD.idea",
-    sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIC/191.6014.8/ideaIC-191.6014.8.zip",
+    sha256 = "8e8b98a2fdbdc3d94441bd55016d9638960cd52b5dbb7a19e324994f906cae9a",
+    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIC/191.6707.31/ideaIC-191.6707.31.zip",
 )
 
 # The plugin api for IntelliJ UE 2018.3. This is required to run UE-specific
@@ -29,8 +29,8 @@ http_archive(
 http_archive(
     name = "intellij_ue_2018_3",
     build_file = "@//intellij_platform_sdk:BUILD.ue",
-    sha256 = "fc8e4fd5801e0675e46354b7eaeac962c0dc713658583e2e87fec2cfdfa0c297",
-    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIU/2018.3.5/ideaIU-2018.3.5.zip",
+    sha256 = "727882a57673636bc4333e670e7b964869775fffc2275de60001d691fe63e1c0",
+    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIU/2018.3.6/ideaIU-2018.3.6.zip",
 )
 
 # The plugin api for IntelliJ UE 2019.1. This is required to run UE-specific
@@ -38,8 +38,8 @@ http_archive(
 http_archive(
     name = "intellij_ue_2019_1",
     build_file = "@//intellij_platform_sdk:BUILD.ue",
-    sha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIU/191.6014.8/ideaIU-191.6014.8.zip",
+    sha256 = "90a5fa492c18b0f1014d19dc92d785cebc2fc7da1ecbb8c79ca8c8917482ba82",
+    url = "https://www.jetbrains.com/intellij-repository/releases/com/jetbrains/intellij/idea/ideaIU/191.6707.31/ideaIU-191.6707.31.zip",
 )
 
 # The plugin api for CLion 2018.3. This is required to build CLwB,
@@ -49,6 +49,15 @@ http_archive(
     build_file = "@//intellij_platform_sdk:BUILD.clion",
     sha256 = "963fb343272e5903ac7dc944cc64ea9541ab4c150cc4ea796dcb0fb613bff4fd",
     url = "https://download.jetbrains.com/cpp/CLion-2018.3.4.tar.gz",
+)
+
+# The plugin api for CLion 2019.1. This is required to build CLwB,
+# and run integration tests.
+http_archive(
+    name = "clion_2019_1",
+    build_file = "@//intellij_platform_sdk:BUILD.clion",
+    sha256 = "f2779475f33ad922019673d66824ba9c6adbe349ed8711350a8f9e65b6b598e6",
+    url = "https://download.jetbrains.com/cpp/CLion-2019.1.tar.gz",
 )
 
 # Python plugin for Android Studio 3.3. Required at compile-time for python-specific features.
@@ -89,8 +98,8 @@ http_archive(
         "    visibility = ['//visibility:public'],",
         ")",
     ]),
-    sha256 = "58a9ef354840434f5a292bc700f9a1d68001dcf65a7f02866e66597450241233",
-    url = "https://plugins.jetbrains.com/files/7322/59086/python-ce-2019.1.191.6014.8.zip",
+    sha256 = "378002fa79623341a31bd3ac003506f04ac950d43313c8d413c6f0763826eadd",
+    url = "https://plugins.jetbrains.com/files/7322/60398/python-ce-2019.1.191.6707.7.zip",
 )
 
 # Go plugin for IntelliJ UE. Required at compile-time for Bazel integration.
@@ -159,8 +168,8 @@ http_archive(
 http_archive(
     name = "android_studio_3_4",
     build_file = "@//intellij_platform_sdk:BUILD.android_studio",
-    sha256 = "090b1d6e39e9cc0b4e01943420eeecb8a611785e9cafe9dbedf0ff608f35ed34",
-    url = "https://dl.google.com/dl/android/studio/ide-zips/3.4.0.16/android-studio-ide-183.5370308-linux.zip",
+    sha256 = "01fb2de2c1650d99d5f4c9a706034780e712e0af8648243fdc0a36390ebb8aec",
+    url = "https://dl.google.com/dl/android/studio/ide-zips/3.4.0.17/android-studio-ide-183.5400832-linux.zip",
 )
 
 # LICENSE: Common Public License 1.0
@@ -256,18 +265,11 @@ http_archive(
     urls = ["https://github.com/protocolbuffers/protobuf/archive/v3.6.1.3.zip"],
 )
 
-http_archive(
-    name = "android_studio_3_4",
-    build_file = "@//intellij_platform_sdk:BUILD.android_studio",
-    sha256 = "d99718ad7090329712042c2725dafccf7f0be56e2c7017db9727f129b1576757",
-    url = "https://dl.google.com/android/studio/ide-zips/3.4.0.11/android-studio-ide-183.5240537-linux.zip",
-)
-
 # BEGIN-EXTERNAL-SCALA
 # LICENSE: The Apache Software License, Version 2.0
 git_repository(
     name = "io_bazel_rules_scala",
-    commit = "326b4ce252c36aeff2232e241ff4bfd8d6f6e071",
+    commit = "7bc18d07001cbfd425c6761c8384c4e982d25a2b",
     remote = "https://github.com/bazelbuild/rules_scala.git",
 )
 
